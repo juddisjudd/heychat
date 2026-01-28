@@ -43,6 +43,9 @@ jobs:
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
+      - name: verify rust cache
+        uses: Swatinem/rust-cache@v2
+
       - name: setup bun
         uses: oven-sh/setup-bun@v1
         with:
