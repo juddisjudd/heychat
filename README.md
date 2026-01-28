@@ -31,3 +31,5 @@ Download the latest release for your platform from the [Releases](https://github
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/P5P57KRR9)
