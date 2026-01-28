@@ -1,3 +1,4 @@
+import React from 'react';
 import { ChatMessage, Emote } from "../types";
 import { Star } from "lucide-react"; // Import necessary icons
 
@@ -5,7 +6,7 @@ import { Star } from "lucide-react"; // Import necessary icons
 // Helper to replace text with emote images AND highlight mentions
 const renderMessageWithEmotes = (text: string, emotes?: Emote[], highlightTerms?: string[]) => {
     // 1. Split by emotes first (highest priority)
-    const emoteParts: (string | JSX.Element)[] = [];
+    const emoteParts: React.ReactNode[] = [];
     
     if (!emotes || emotes.length === 0) {
         emoteParts.push(text);
