@@ -1,0 +1,375 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column; /* Ensure vertical stacking if needed, but mainly remove place-items center */
+  width: 100vw;
+  height: 100vh;
+  box-sizing: border-box;
+  background-color: #0d0d0d;
+  color: #fff;
+  overflow: hidden; /* Prevent body scroll */
+}
+
+/* Restoring container styles */
+.container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  padding-top: 32px; /* Space for TitleBar */
+}
+
+/* Remove duplicate .container block by replacing preceding lines if needed or just deleting */
+/* The tool replaces a range. I will target the body block and the first container block, then I will delete the second container block in a separate call or large chunk? */
+/* Actually, the replace tool targets specific lines. */
+/* Let's just fix body first, effectively. */
+/* Wait, I can do both if I target a large chunk? No, they are far apart. */
+/* I will use multi_replace? Or just two calls. Two calls is safer. */
+/* First call: Fix body and primary container. */
+
+
+*, *:before, *:after {
+    box-sizing: border-box;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+}
+
+.badge {
+  color: #888;
+}
+
+.mod-badge {
+  color: #00ad03;
+}
+
+.mod-message {
+  background: linear-gradient(90deg, rgba(0, 173, 3, 0.1) 0%, transparent 100%);
+  border-left: 2px solid #00ad03;
+  padding-left: 6px;
+}
+
+.vip-badge {
+  color: #e9199f;
+}
+
+.favorite-badge {
+  color: #ffd700; /* Gold */
+}
+
+.favorite-message {
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.1) 0%, transparent 100%);
+  border-left: 2px solid #ffd700;
+  padding-left: 6px;
+}
+
+.vip-message {
+  background: linear-gradient(90deg, rgba(233, 25, 159, 0.1) 0%, transparent 100%);
+  border-left: 2px solid #e9199f;
+  padding-left: 6px; /* Offset for the border */
+}
+
+
+
+.sidebar {
+  background-color: #121212;
+  border-right: 1px solid #2a2a2a;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease;
+  position: relative;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar.open {
+    width: 320px;
+    padding: 20px;
+}
+
+.sidebar.closed {
+    width: 0;
+    padding: 20px 0; /* Vertical padding kept, horizontal removed */
+    border-right: none;
+}
+
+/* Wrapper to prevent content squishing during transition */
+.sidebar-content {
+    min-width: 280px; /* 320px - 40px padding */
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    height: 100%; /* Take full height of sidebar */
+}
+
+.sidebar-footer {
+    margin-top: auto; /* Push to bottom */
+    font-size: 0.75rem;
+    color: #444;
+    text-align: center;
+    padding-top: 20px;
+    border-top: 1px solid #1a1a1a;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.sidebar-toggle-btn {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    z-index: 100;
+    
+    background-color: #121212;
+    border: 1px solid #2a2a2a;
+    border-left: none; /* Merge with sidebar */
+    color: #888;
+    
+    width: 24px;
+    height: 48px;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s;
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.sidebar-toggle-btn.open {
+    left: 320px;
+}
+
+.sidebar-toggle-btn:hover {
+    color: #fff;
+    background-color: #1e1e1e;
+}
+
+.sidebar h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #fff;
+    letter-spacing: -0.5px;
+}
+
+.connection-group h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #666;
+    letter-spacing: 1px;
+    margin: 0 0 8px 0;
+    font-weight: 600;
+}
+
+.input-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+input, textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #333;
+  background-color: #1e1e1e;
+  color: #eee;
+  font-family: inherit;
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+}
+
+input:focus, textarea:focus {
+    outline: none;
+    border-color: #555;
+    background-color: #252525;
+}
+
+textarea.favorites-input {
+    min-height: 100px;
+    resize: vertical;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.action-btn {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: none;
+  background-color: #333;
+  color: white;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.action-btn:hover {
+  background-color: #444;
+}
+
+.disconnect-btn {
+    background-color: #3a1d1d;
+    color: #ffaaaa;
+}
+
+.disconnect-btn:hover {
+    background-color: #552a2a;
+}
+
+.main-content {
+  flex: 1;
+  background-color: #0d0d0d; /* Ultra dark for chat */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Chat Item Styles */
+.chat-list {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-message-item {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px; /* Slightly more padding */
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.message-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 0.9em;
+}
+
+.platform-icon {
+  display: flex;
+  align-items: center;
+}
+
+.badges {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.username {
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.separator {
+  margin-right: 4px;
+  color: #888;
+}
+
+.text {
+  color: #ddd;
+}
+
+/* Chat Controls Toolbar */
+.chat-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background-color: #0d0d0d;
+    border-bottom: 1px solid #1f1f1f;
+    min-height: 48px;
+}
+
+.search-container {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.search-icon {
+    position: absolute;
+    left: 10px;
+    color: #666;
+    pointer-events: none;
+}
+
+.search-input {
+    width: 100%;
+    background-color: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 6px 10px 6px 34px; /* Left padding for icon */
+    color: #ddd;
+    font-size: 0.9rem;
+    height: 32px;
+}
+
+.search-input:focus {
+    border-color: #555;
+    background-color: #222;
+}
+
+.toolbar-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid #333;
+    background-color: #1a1a1a;
+    color: #888;
+    cursor: pointer;
+    font-size: 0.85rem;
+    height: 32px;
+    transition: all 0.2s;
+}
+
+.toolbar-btn:hover {
+    background-color: #252525;
+    color: #fff;
+    border-color: #555;
+}
+
+.clear-btn:hover {
+    color: #ff6b6b;
+    border-color: #663333;
+    background-color: #2a1111;
+}
