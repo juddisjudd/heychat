@@ -38,7 +38,7 @@
       "endpoints": [
         "https://github.com/juddisjudd/heychat/releases/latest/download/latest.json"
       ],
-      "pubkey": "YOUR_PUBLIC_KEY_HERE"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY1RDI2NzE0NjEwRkRDQzAKUldUQTNBOWhGR2ZTOVdUcW1xWVNMSTZCTHFPL3BGeWxVMnlyYmdZSzBpYm5oVEtadFNWVFRaK3AK"
     }
   }
 }
