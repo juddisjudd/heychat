@@ -2,7 +2,7 @@
 
 A minimal, always-on-top chat overlay for streamers that aggregates messages from Twitch and YouTube Live. Built with Tauri and React.
 
-![HeyChat Screenshot](https://raw.githubusercontent.com/juddisjudd/heychat/main/screenshot.png)
+<img width="1510" height="761" alt="heychat_k0BhhAGaHS" src="https://github.com/user-attachments/assets/167d7dc7-74df-41a1-ac88-affee1f23ced" />
 
 ## Features
 
@@ -27,36 +27,6 @@ Download the latest release for your platform from the [Releases](https://github
 3.  **YouTube**: Enter a Video ID, full URL, or Channel Handle (e.g., `@handle`) and click Connect.
 4.  **Favorites**: Add usernames to the "Favorites" list in the sidebar to highlight their messages in gold.
 5.  **Filtering**: Use the search bar at the top to filter messages by user.
-
-## Development
-
-To build or modify HeyChat from source:
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) & [Bun](https://bun.sh/)
-- [Rust](https://www.rust-lang.org/tools/install)
-
-### Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/juddisjudd/heychat.git
-cd heychat
-
-# Install dependencies
-bun install
-
-# Run in development mode
-bun run tauri dev
-```
-
-### Building
-
-```bash
-# Build for production
-bun run tauri build
-```
 
 ## License
 
