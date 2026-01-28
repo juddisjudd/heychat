@@ -119,12 +119,37 @@ body {
 }
 
 .sidebar-footer {
-    margin-top: auto; /* Push to bottom */
+    margin-top: auto;
     font-size: 0.75rem;
     color: #444;
     text-align: center;
     padding-top: 20px;
     border-top: 1px solid #1a1a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.github-link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #888;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.github-link:hover {
+    color: #fff;
+}
+
+.footer-separator {
+    color: #333;
+}
+
+.version-text {
+    color: #555;
 }
 
 .sidebar-header {

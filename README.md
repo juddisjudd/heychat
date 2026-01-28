@@ -1,7 +1,63 @@
-# Tauri + React + Typescript
+# HeyChat
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+A minimal, always-on-top chat overlay for streamers that aggregates messages from Twitch and YouTube Live. Built with Tauri and React.
 
-## Recommended IDE Setup
+![HeyChat Screenshot](https://raw.githubusercontent.com/juddisjudd/heychat/main/screenshot.png)
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+## Features
+
+- **Multi-Platform Support**: Connects to Twitch and YouTube Live simultaneously.
+- **Customizable UI**: Dark mode, custom title bar, and a compact overlay design.
+- **Always on Top**: Designed to float over your game or creative software.
+- **Chat Controls**: Filter messages by username or clear the chat instantly.
+- **Emote Support**: Renders Twitch emotes natively.
+
+## Installation
+
+Download the latest release for your platform from the [Releases](https://github.com/juddisjudd/heychat/releases) page.
+
+1.  **Windows**: Run the `.exe` installer.
+2.  **Linux**: Use the AppImage or `.deb` package.
+3.  **macOS**: Drag the `.app` to your Applications folder.
+
+## Usage
+
+1.  Launch **HeyChat**.
+2.  **Twitch**: Enter your channel name (e.g., `raxxanterax`) and click Connect.
+3.  **YouTube**: Enter a Video ID, full URL, or Channel Handle (e.g., `@handle`) and click Connect.
+4.  **Favorites**: Add usernames to the "Favorites" list in the sidebar to highlight their messages in gold.
+5.  **Filtering**: Use the search bar at the top to filter messages by user.
+
+## Development
+
+To build or modify HeyChat from source:
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) & [Bun](https://bun.sh/)
+- [Rust](https://www.rust-lang.org/tools/install)
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/juddisjudd/heychat.git
+cd heychat
+
+# Install dependencies
+bun install
+
+# Run in development mode
+bun run tauri dev
+```
+
+### Building
+
+```bash
+# Build for production
+bun run tauri build
+```
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.

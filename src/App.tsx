@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { check } from "@tauri-apps/plugin-updater";
 import { getVersion } from "@tauri-apps/api/app";
-import { Eraser, Search as SearchIcon } from "lucide-react";
+import { Eraser, Search as SearchIcon, Github } from "lucide-react";
 import { ChatMessage } from "./types";
 import { ChatList } from "./components/ChatList";
 import TitleBar from "./components/TitleBar";
@@ -18,6 +19,25 @@ function App() {
   const [favoritesInput, setFavoritesInput] = useState("");
   const [appVersion, setAppVersion] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Check for updates on mount
+  useEffect(() => {
+    const checkForUpdates = async () => {
+        try {
+            const update = await check();
+            if (update?.available) {
+                console.log(`Update to ${update.version} available!`);
+                await update.downloadAndInstall();
+                // Notify user to restart
+                alert(`Update to v${update.version} installed. Please restart HeyChat to apply.`);
+            }
+        } catch (error) {
+            console.error("Update check failed (this is expected in dev mode):", error);
+        }
+    };
+    
+    checkForUpdates();
+  }, []);
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -59,7 +79,6 @@ function App() {
       const unlistenFn = await listen<ChatMessage>("chat-message", (event) => {
           console.log("Frontend received event:", event);
           setMessages((prev) => {
-              // Optional: dedup by ID just in case, though listener fix should be enough
               if (prev.some(m => m.id === event.payload.id)) return prev;
               return [...prev.slice(-200), event.payload];
           }); 
@@ -145,14 +164,14 @@ function App() {
                   disabled={youtubeConnected}
                 />
                 {!youtubeConnected ? (
-                    <button onClick={connectYoutube} className="action-btn">Connect</button>
+                  <button onClick={connectYoutube} className="action-btn">Connect</button>
                 ) : (
-                    <button 
-                      onClick={() => setYoutubeConnected(false)} 
-                      className="action-btn disconnect-btn"
-                    >
-                      Disconnect
-                    </button>
+                  <button 
+                    onClick={async () => new Promise(resolve => setTimeout(resolve, 0)).then(() => setYoutubeConnected(false))} 
+                    className="action-btn disconnect-btn"
+                  >
+                    Disconnect
+                  </button>
                 )}
             </div>
           </div>
@@ -168,7 +187,23 @@ function App() {
           </div>
 
           <div className="sidebar-footer">
-            v{appVersion}
+            <div 
+                onClick={async () => {
+                    try {
+                        await invoke('open_link', { url: 'https://github.com/juddisjudd/heychat' });
+                    } catch (e) {
+                         console.error("Failed to open URL:", e);
+                         window.open('https://github.com/juddisjudd/heychat', '_blank');
+                    }
+                }}
+                className="github-link"
+                title="View Source on GitHub"
+            >
+                <Github size={14} />
+                <span>Open Source</span>
+            </div>
+            <span className="footer-separator">|</span>
+            <span className="version-text">v{appVersion}</span>
           </div>
         </div>
       </div>

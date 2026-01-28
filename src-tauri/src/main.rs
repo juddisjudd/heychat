@@ -22,10 +22,16 @@ fn join_youtube(app: AppHandle, video_id: String) {
     });
 }
 
+#[tauri::command]
+fn open_link(url: String) {
+    let _ = opener::open(url);
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![join_twitch, join_youtube])
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .invoke_handler(tauri::generate_handler![join_twitch, join_youtube, open_link])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
