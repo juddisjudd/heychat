@@ -1,6 +1,6 @@
 [package]
 name = "heychat"
-version = "1.0.3"
+version = "1.0.4"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -30,4 +30,5 @@ chrono = "0.4.43"
 reqwest = { version = "0.13.1", features = ["json"] }
 regex = "1.12.2"
 opener = "0.7"
+image = "0.24"
 

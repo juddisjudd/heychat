@@ -37,6 +37,28 @@ pub async fn start_twitch_handler(app: AppHandle, channel: String) {
                     end: e.char_range.end,
                 }).collect();
 
+                // Check for Bits
+                let bits_amount = msg.source.tags.0.get("bits").and_then(|s: &Option<String>| s.clone());
+                
+                // Check for Channel Point Redemption
+                // Twitch sends "custom-reward-id" tag if a reward was redeemed
+                let custom_reward_id = msg.source.tags.0.get("custom-reward-id").and_then(|s: &Option<String>| s.clone());
+
+                let mut system_message = None;
+                let mut msg_type = "chat".to_string();
+
+                if let Some(bits) = bits_amount {
+                    system_message = Some(format!("Cheered {} Bits!", bits));
+                    msg_type = "sub".to_string(); // Use "sub" style for now as it draws attention
+                } else if custom_reward_id.is_some() {
+                     // We might get "msg-id": "highlighted-message" for "Highlight My Message" reward
+                     // But custom-reward-id is generic for any reward.
+                     // Often we don't have the reward NAME in the tags, just the ID.
+                     // But we can genericize it:
+                     system_message = Some("Redeemed a Channel Reward!".to_string());
+                     msg_type = "sub".to_string();
+                }
+
                 let chat_message = ChatMessage {
                     id: msg.message_id,
                     platform: Platform::Twitch,
@@ -46,8 +68,11 @@ pub async fn start_twitch_handler(app: AppHandle, channel: String) {
                     badges: msg.badges.iter().map(|b| b.name.clone()).collect(),
                     is_mod,
                     is_vip,
+                    is_member: false,
                     timestamp: chrono::Local::now().to_rfc3339(),
                     emotes,
+                    msg_type,
+                    system_message,
                 };
                 
                 if let Err(e) = app_clone.emit("chat-message", chat_message) {
@@ -57,6 +82,31 @@ pub async fn start_twitch_handler(app: AppHandle, channel: String) {
                 }
             } else if let ServerMessage::Notice(msg) = message {
                  eprintln!("Twitch Notice: {}", msg.message_text);
+            } else if let ServerMessage::UserNotice(msg) = message {
+                // Handle Subs, Resubs, Raids, etc.
+                eprintln!("Twitch UserNotice: {:?}", msg);
+                
+                let system_msg = msg.system_message; 
+                let user_text = msg.message_text.unwrap_or_default();
+                let sender_name = msg.sender.name; // User who subbed
+
+                // Always emit UserNotice (Sub/Resub)
+                 let chat_message = ChatMessage {
+                    id: msg.source.tags.0.get("id").and_then(|s| s.clone()).unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+                    platform: Platform::Twitch,
+                    username: sender_name,
+                    message: user_text,
+                    color: Some("#9146FF".to_string()), // Default system color, but maybe user color?
+                    badges: vec![],
+                    is_mod: false,
+                    is_vip: false,
+                    is_member: false,
+                    timestamp: chrono::Local::now().to_rfc3339(),
+                    emotes: vec![], // Emotes in system msg? tricky.
+                    msg_type: "sub".to_string(),
+                    system_message: Some(system_msg),
+                };
+                app_clone.emit("chat-message", chat_message).unwrap_or(());
             } else if let ServerMessage::Join(msg) = message {
                  eprintln!("Twitch Joined: {}", msg.channel_login);
             }

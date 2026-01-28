@@ -9,6 +9,7 @@
         "@tauri-apps/plugin-opener": "^2",
         "@tauri-apps/plugin-updater": "^2.9.0",
         "date-fns": "^4.1.0",
+        "image": "^1.0.2",
         "lucide-react": "^0.563.0",
         "opener": "^1.5.2",
         "react": "^19.1.0",
@@ -225,6 +226,8 @@
 
     "baseline-browser-mapping": ["baseline-browser-mapping@2.9.19", "", { "bin": { "baseline-browser-mapping": "dist/cli.js" } }, "sha512-ipDqC8FrAl/76p2SSWKSI+H9tFwm7vYqXQrItCuiVPt26Km0jS+NzSsBWAaBusvSbQcfJG+JitdMm+wZAgTYqg=="],
 
+    "bindings": ["bindings@1.1.0", "", {}, "sha512-OQIZVhw1kxFCHXG7Ks7IcMXODgcFhE6BRY8nQI0MIoGMoAkMEG8WLezPi3Snn5Ut4Eo33Esc0KuRMlUeNzUoUQ=="],
+
     "browserslist": ["browserslist@4.28.1", "", { "dependencies": { "baseline-browser-mapping": "^2.9.0", "caniuse-lite": "^1.0.30001759", "electron-to-chromium": "^1.5.263", "node-releases": "^2.0.27", "update-browserslist-db": "^1.2.0" }, "bin": { "browserslist": "cli.js" } }, "sha512-ZC5Bd0LgJXgwGqUknZY/vkUQ04r8NXnJZ3yYi4vDmSiZmC/pdSN0NbNRPxZpbtO4uAfDUAFffO8IZoM3Gj8IkA=="],
 
     "caniuse-lite": ["caniuse-lite@1.0.30001766", "", {}, "sha512-4C0lfJ0/YPjJQHagaE9x2Elb69CIqEPZeG0anQt9SIvIoOH4a4uaRl73IavyO+0qZh6MDLH//DrXThEYKHkmYA=="],
@@ -249,6 +252,12 @@
 
     "gensync": ["gensync@1.0.0-beta.2", "", {}, "sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg=="],
 
+    "gif": ["gif@2.0.2", "", { "dependencies": { "bindings": "1.1.0" } }, "sha512-1kEZRAur8JX0pDeKSHJvtZM+eaAoCRB1UZdAUKlAhjynJWfZ1vXI8Y3/Ij1aGu6T2SySynQyllA/q8iVpYTwPQ=="],
+
+    "image": ["image@1.0.2", "", { "dependencies": { "gif": "*", "jpeg": "*", "png": "*" } }, "sha512-4A5e7ScSvyOongci3ywgrzBj7Uh2/5y7jW30eghcQKFZxH3y0QEQHs+UYpV8gjs7FLaCEXqlKs6luxb99PpPYA=="],
+
+    "jpeg": ["jpeg@2.0.0", "", {}, "sha512-4rDExzg3EeYfUUQYZtJ9tw/sU6oyU4XTb3J8bUEKZOqMErZ6No9nT7O/snTX72lgD5z6uIK9gJoCU7mpSzf+zQ=="],
+
     "js-tokens": ["js-tokens@4.0.0", "", {}, "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="],
 
     "jsesc": ["jsesc@3.1.0", "", { "bin": { "jsesc": "bin/jsesc" } }, "sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA=="],
@@ -270,6 +279,8 @@
     "picocolors": ["picocolors@1.1.1", "", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
 
     "picomatch": ["picomatch@4.0.3", "", {}, "sha512-5gTmgEY/sqK6gFXLIsQNH19lWb4ebPDLA4SdLP7dsWkIXHWlG66oPuVvXSGFPppYZz8ZDZq0dYYrbHfBCVUb1Q=="],
+
+    "png": ["png@3.0.3", "", {}, "sha512-53npnXKg9Pecjt94DgXM52fbY7H/vfnvGhA2+7dG7c1YpptGHYwnbah2c3CQstZOXBtvcYooals4ZIOS/84rYw=="],
 
     "postcss": ["postcss@8.5.6", "", { "dependencies": { "nanoid": "^3.3.11", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg=="],
 

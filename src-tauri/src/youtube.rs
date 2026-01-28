@@ -153,6 +153,9 @@ pub async fn start_youtube_handler(app: AppHandle, video_id: String) {
     eprintln!("Initial Continuation: {}...", &continuation[0..10]);
 
     // 5. Polling Loop
+    // Filter out messages older than connection time
+    let start_time = std::time::SystemTime::now();
+    
     let mut polling = true;
     while polling {
         let chat_url = format!("https://www.youtube.com/youtubei/v1/live_chat/get_live_chat?key={}", api_key);
@@ -174,6 +177,18 @@ pub async fn start_youtube_handler(app: AppHandle, video_id: String) {
                     if let Some(actions) = json.pointer("/continuationContents/liveChatContinuation/actions").and_then(|v| v.as_array()) {
                         for action in actions {
                             if let Some(item) = action.pointer("/addChatItemAction/item/liveChatTextMessageRenderer") {
+                                // Parse Timestamp first to filter history
+                                let timestamp_usec_str = item["timestampUsec"].as_str().unwrap_or("0");
+                                let timestamp_usec: u64 = timestamp_usec_str.parse().unwrap_or(0);
+                                let timestamp_micros = start_time.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_micros() as u64;
+                                
+                                // Buffer of 10 seconds? Or strict? 
+                                // If message is older than start_time, ignore it.
+                                // NOTE: YouTube sends history batch. We want to skip it.
+                                if timestamp_usec < timestamp_micros {
+                                    continue;
+                                }
+
                                 // Parse Message
                                 let id = item["id"].as_str().unwrap_or("").to_string();
                                 let author_name = item.pointer("/authorName/simpleText").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
@@ -190,20 +205,44 @@ pub async fn start_youtube_handler(app: AppHandle, video_id: String) {
                                     }
                                 }
                                 
-                                let is_mod = false; // logic needed
-                                let is_vip = false;
+                                let mut is_mod = false;
+                                let mut is_member = false;
+                                
+                                if let Some(badges) = item.pointer("/authorBadges").and_then(|v| v.as_array()) {
+                                    for badge in badges {
+                                        if let Some(tooltip) = badge.pointer("/liveChatAuthorBadgeRenderer/tooltip").and_then(|v| v.as_str()) {
+                                            if tooltip.contains("Moderator") {
+                                                is_mod = true;
+                                            } else if tooltip.contains("Member") {
+                                                is_member = true;
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                let is_vip = false; 
+
+                                let mut color = None;
+                                if is_mod {
+                                    color = Some("#5e84f1".to_string()); // YouTube Mod Blue
+                                } else if is_member {
+                                    color = Some("#0f9d58".to_string()); // YouTube Member Green
+                                }
                                 
                                 let chat_message = ChatMessage {
                                     id,
                                     platform: Platform::YouTube,
                                     username: author_name,
                                     message: message_text,
-                                    color: None,
+                                    color,
                                     badges: vec![],
                                     is_mod, 
                                     is_vip,
+                                    is_member,
                                     timestamp: chrono::Local::now().to_rfc3339(),
                                     emotes: vec![],
+                                    msg_type: "chat".to_string(),
+                                    system_message: None,
                                 };
                                 
                                 app_clone.emit("chat-message", chat_message).unwrap_or(());

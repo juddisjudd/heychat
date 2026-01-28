@@ -24,6 +24,9 @@ pub struct ChatMessage {
     pub badges: Vec<String>,
     pub is_mod: bool,
     pub is_vip: bool,
+    pub is_member: bool,
     pub timestamp: String,
     pub emotes: Vec<Emote>,
+    pub msg_type: String, // "chat" or "sub"
+    pub system_message: Option<String>,
 }

@@ -5,9 +5,10 @@ import { ChatMessageItem } from "./ChatMessageItem";
 interface Props {
     messages: ChatMessage[];
     favorites: string[];
+    highlightTerms: string[];
 }
 
-export const ChatList: React.FC<Props> = ({ messages, favorites }) => {
+export const ChatList: React.FC<Props> = ({ messages, favorites, highlightTerms }) => {
     const bottomRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -21,6 +22,7 @@ export const ChatList: React.FC<Props> = ({ messages, favorites }) => {
                     key={msg.id} 
                     msg={msg} 
                     isFavorite={favorites.includes(msg.username.toLowerCase())}
+                    highlightTerms={highlightTerms}
                 />
             ))}
             <div ref={bottomRef} />

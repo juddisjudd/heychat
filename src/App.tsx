@@ -3,11 +3,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { check } from "@tauri-apps/plugin-updater";
 import { getVersion } from "@tauri-apps/api/app";
-import { Eraser, Search as SearchIcon, Github } from "lucide-react";
+import { Eraser, Search as SearchIcon, Github, Heart, Shield, Bot } from "lucide-react";
 import { ChatMessage } from "./types";
 import { ChatList } from "./components/ChatList";
 import TitleBar from "./components/TitleBar";
 import "./App.css";
+
+const COMMON_BOTS = ['streamlabs', 'streamelements', 'moobot', 'nightbot', 'fossabot', 'soundalerts'];
 
 function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -19,6 +21,8 @@ function App() {
   const [favoritesInput, setFavoritesInput] = useState("");
   const [appVersion, setAppVersion] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'TWITCH' | 'YOUTUBE' | 'VIP' | 'MOD'>('ALL');
+  const [hideBots, setHideBots] = useState(false);
 
   // Check for updates on mount
   useEffect(() => {
@@ -116,9 +120,29 @@ function App() {
   const favoriteUsers = favoritesInput.split("\n").map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
   
   const filteredMessages = messages.filter(msg => {
-      if (!searchQuery) return true;
-      return msg.username.toLowerCase().includes(searchQuery.toLowerCase());
+      // 1. Bot Filter (Highest priority exclusion)
+      if (hideBots && COMMON_BOTS.includes(msg.username.toLowerCase())) {
+          return false;
+      }
+
+      // 2. Search Query
+      if (searchQuery && !msg.username.toLowerCase().includes(searchQuery.toLowerCase())) {
+          return false;
+      }
+
+      // 3. Quick Filters
+      switch (activeFilter) {
+          case 'TWITCH': return msg.platform === 'Twitch';
+          case 'YOUTUBE': return msg.platform === 'YouTube';
+          case 'VIP': return msg.is_vip;
+          case 'MOD': return msg.is_mod;
+          case 'ALL': default: return true;
+      }
   });
+
+  const toggleFilter = (filter: typeof activeFilter) => {
+      setActiveFilter(prev => prev === filter ? 'ALL' : filter);
+  };
 
   return (
     <>
@@ -229,6 +253,51 @@ function App() {
                 />
             </div>
             
+            <div className="quick-filters">
+                <button 
+                    className={`filter-btn twitch ${activeFilter === 'TWITCH' ? 'active' : ''}`}
+                    onClick={() => toggleFilter('TWITCH')}
+                    title="Show Twitch Only"
+                >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
+                    </svg>
+                </button>
+                <button 
+                    className={`filter-btn youtube ${activeFilter === 'YOUTUBE' ? 'active' : ''}`}
+                    onClick={() => toggleFilter('YOUTUBE')}
+                    title="Show YouTube Only"
+                >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                </button>
+                <button 
+                    className={`filter-btn vip ${activeFilter === 'VIP' ? 'active' : ''}`}
+                    onClick={() => toggleFilter('VIP')}
+                    title="Show VIPs Only"
+                >
+                    <Heart size={16} fill="currentColor" />
+                </button>
+                <button 
+                    className={`filter-btn mod ${activeFilter === 'MOD' ? 'active' : ''}`}
+                    onClick={() => toggleFilter('MOD')}
+                    title="Show Mods Only"
+                >
+                    <Shield size={16} fill="currentColor" />
+                </button>
+                
+                <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', height: '20px', margin: '0 4px' }} />
+
+                <button 
+                    className={`filter-btn bot ${hideBots ? 'active' : ''}`}
+                    onClick={() => setHideBots(!hideBots)}
+                    title={hideBots ? "Show Bots" : "Hide Bots"}
+                >
+                    <Bot size={16} fill={hideBots ? "currentColor" : "none"} strokeWidth={hideBots ? 0 : 2} />
+                </button>
+            </div>
+
             <button 
                 onClick={() => setMessages([])} 
                 className="toolbar-btn clear-btn"
@@ -238,7 +307,11 @@ function App() {
                 <span>Clear</span>
             </button>
         </div>
-        <ChatList messages={filteredMessages} favorites={favoriteUsers} />
+        <ChatList 
+            messages={filteredMessages} 
+            favorites={favoriteUsers} 
+            highlightTerms={[twitchChannel, youtubeVideoId].filter(Boolean)}
+        />
       </div>
     </div>
     </>

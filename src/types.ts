@@ -14,6 +14,9 @@ export interface ChatMessage {
     badges: string[];
     is_mod: boolean;
     is_vip: boolean;
+    is_member: boolean;
     timestamp: string;
     emotes?: Emote[];
+    msg_type?: 'chat' | 'sub';
+    system_message?: string;
 }
