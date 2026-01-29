@@ -67,3 +67,13 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Upload updater artifact (latest.json)
+        uses: softprops/action-gh-release@v1
+        if: success()
+        with:
+          files: |
+            src-tauri/target/**/updater/latest.json
+            src-tauri/target/**/updater/latest.json.sig
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
