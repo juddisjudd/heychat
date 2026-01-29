@@ -1,6 +1,8 @@
 # HeyChat
 
-A minimal, always-on-top chat overlay for streamers that aggregates messages from Twitch and YouTube Live. Built with Tauri and React.
+A minimal, chat app for streamers that aggregates messages from Twitch and YouTube Live.
+
+[![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/juddisjudd/heychat/latest/total)](https://github.com/juddisjudd/heychat/releases) [![GitHub Release](https://img.shields.io/github/v/release/juddisjudd/heychat)](https://github.com/juddisjudd/heychat/releases) [![Release](https://github.com/juddisjudd/heychat/actions/workflows/release.yml/badge.svg)](https://github.com/juddisjudd/heychat/actions/workflows/release.yml)
 
 ![heychat_2PJVyRfvjQ](https://github.com/user-attachments/assets/e841e58f-1b50-4c13-9326-ddc7491244a1)
 
@@ -9,7 +11,6 @@ A minimal, always-on-top chat overlay for streamers that aggregates messages fro
 
 - **Multi-Platform Support**: Connects to Twitch and YouTube Live simultaneously.
 - **Customizable UI**: Dark mode, custom title bar, and a compact overlay design.
-- **Always on Top**: Designed to float over your game or creative software.
 - **Chat Controls**: Filter messages by username or clear the chat instantly.
 - **Emote Support**: Renders Twitch emotes natively.
 
