@@ -2,7 +2,8 @@
 
 A minimal, always-on-top chat overlay for streamers that aggregates messages from Twitch and YouTube Live. Built with Tauri and React.
 
-![heychat_Sok9eRr79Q](https://github.com/user-attachments/assets/d57f1d44-ab86-4a9e-8ee9-b21695dec8c2)
+![heychat_2PJVyRfvjQ](https://github.com/user-attachments/assets/e841e58f-1b50-4c13-9326-ddc7491244a1)
+
 
 ## Features
 
