@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
-import { Eraser, Search as SearchIcon, Github, Heart, Shield, Bot } from "lucide-react";
+import { Eraser, Search as SearchIcon, Github, Heart, Shield, Bot, LogIn } from "lucide-react";
 import { ChatMessage } from "./types";
 import { ChatList } from "./components/ChatList";
 import TitleBar from "./components/TitleBar";
 import { UpdateNotification } from "./components/UpdateNotification";
+import { LoginModal } from "./components/LoginModal";
+import { ChatInput } from "./components/ChatInput";
 import "./App.css";
 
 import { fetchThirdPartyEmotes, EmoteMap } from "./utils/emotes";
@@ -27,6 +29,11 @@ function App() {
   const [hideBots, setHideBots] = useState(false);
   const [thirdPartyEmotes, setThirdPartyEmotes] = useState<EmoteMap>(new Map());
 
+  // Twitch Auth
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [twitchUser, setTwitchUser] = useState("");
+  const [twitchToken, setTwitchToken] = useState("");
+
   // Load settings from localStorage on mount
   useEffect(() => {
     // ... localStorage loading ...
@@ -36,11 +43,15 @@ function App() {
     const savedYoutube = localStorage.getItem("heychat_youtube_id");
     const savedSidebar = localStorage.getItem("heychat_sidebar_open");
     const savedFavorites = localStorage.getItem("heychat_favorites");
+    const savedTwitchUser = localStorage.getItem("heychat_twitch_username");
+    const savedTwitchToken = localStorage.getItem("heychat_twitch_token");
 
     if (savedTwitch) setTwitchChannel(savedTwitch);
     if (savedYoutube) setYoutubeVideoId(savedYoutube);
     if (savedSidebar !== null) setIsSidebarOpen(savedSidebar === "true");
     if (savedFavorites) setFavoritesInput(savedFavorites);
+    if (savedTwitchUser) setTwitchUser(savedTwitchUser);
+    if (savedTwitchToken) setTwitchToken(savedTwitchToken);
   }, []);
 
   // Save settings when they change
@@ -61,8 +72,14 @@ function App() {
   }, [favoritesInput]);
 
   useEffect(() => {
+      localStorage.setItem("heychat_twitch_username", twitchUser);
+      localStorage.setItem("heychat_twitch_token", twitchToken);
+  }, [twitchUser, twitchToken]);
+
+  useEffect(() => {
     let unlistenChat: (() => void) | undefined;
     let unlistenTwitch: (() => void) | undefined;
+    let unlistenTwitchError: (() => void) | undefined;
 
     const setupListeners = async () => {
       // 1. Chat Messages
@@ -80,6 +97,42 @@ function App() {
           const channelId = event.payload;
           const emotes = await fetchThirdPartyEmotes(channelId);
           setThirdPartyEmotes(emotes);
+          setTwitchConnected(true); // Ensure connected state is verified
+      });
+
+      // 3. Twitch Error (Auth Failure)
+      unlistenTwitchError = await listen<string>("twitch-error", (event) => {
+          console.error("Twitch Error:", event.payload);
+          setTwitchConnected(false);
+          alert(`Twitch Error: ${event.payload}`);
+      });
+
+      // 4. OAuth Token Received (Auto Login)
+      await listen<string>("twitch-token-received", async (event) => {
+          const token = event.payload;
+          console.log("OAuth token received, fetching user info...");
+          
+          try {
+             // We need to fetch the username associated with this token
+             const res = await fetch('https://api.twitch.tv/helix/users', {
+                 headers: {
+                     'Authorization': `Bearer ${token}`,
+                     'Client-Id': 'j07v9449bxjpfqx1msfnceaol2uwhx'
+                 }
+             });
+             
+             if (!res.ok) throw new Error('Failed to fetch user info');
+             const data = await res.json();
+             const user = data.data[0]?.login;
+             
+             if (user) {
+                 handleLogin(user, token);
+                 setIsLoginModalOpen(false); // Close modal if open
+             }
+          } catch (e) {
+              console.error("Auto-login failed:", e);
+              alert("Auto-login failed: " + String(e));
+          }
       });
     };
     
@@ -88,19 +141,66 @@ function App() {
     return () => {
       if (unlistenChat) unlistenChat();
       if (unlistenTwitch) unlistenTwitch();
+      if (unlistenTwitchError) unlistenTwitchError();
     };
   }, []);
 
   async function connectTwitch() {
     if (!twitchChannel) return;
-    await invoke("join_twitch", { channel: twitchChannel });
-    setTwitchConnected(true);
+    try {
+        await invoke("join_twitch", { 
+            channel: twitchChannel,
+            username: twitchUser || null,
+            token: twitchToken || null
+        });
+        setTwitchConnected(true);
+    } catch (e) {
+        console.error("Failed to connect Twitch:", e);
+    }
   }
 
   async function connectYoutube() {
     if (!youtubeVideoId) return;
     await invoke("join_youtube", { videoId: youtubeVideoId });
     setYoutubeConnected(true);
+  }
+
+  async function handleSendMessage(message: string) {
+      if (twitchConnected && twitchToken) {
+           // Try to find user's color from previous messages
+           const existingMsg = messages.find(m => m.username.toLowerCase() === twitchUser.toLowerCase());
+           const userColor = existingMsg?.color || '#9146FF';
+
+           // Optimistic Update: Show message immediately
+           const tempMessage: ChatMessage = {
+               id: `local-${Date.now()}`,
+               platform: 'Twitch',
+               username: twitchUser,
+               message: message,
+               color: userColor,
+               badges: existingMsg?.badges || [], // Also try to reuse badges
+               is_mod: existingMsg?.is_mod || false,
+               is_vip: existingMsg?.is_vip || false,
+               is_member: false,
+               timestamp: new Date().toISOString(),
+               emotes: [],
+               msg_type: 'chat',
+               system_message: undefined
+           };
+
+           setMessages(prev => [...prev.slice(-200), tempMessage]);
+
+           try {
+               await invoke("send_twitch_message", { 
+                   channel: twitchChannel, 
+                   message 
+               });
+           } catch (e) {
+               console.error("Failed to send message:", e);
+               // Optional: Show error state on the message?
+               alert("Failed to send message: " + String(e));
+           }
+      }
   }
   
   const openReleasesPage = async () => {
@@ -139,6 +239,18 @@ function App() {
       setActiveFilter(prev => prev === filter ? 'ALL' : filter);
   };
 
+  const handleLogin = (user: string, token: string) => {
+      setTwitchUser(user);
+      setTwitchToken(token);
+      
+      if (twitchConnected) {
+          setTwitchConnected(false);
+          alert(`Logged in as ${user}. Please click "Connect" again to use your new credentials.`);
+      } else {
+          alert(`Logged in as ${user}. Ready to connect.`);
+      }
+  };
+
   return (
     <>
     <TitleBar />
@@ -150,7 +262,17 @@ function App() {
           </div>
           
           <div className="connection-group">
-            <h3>TWITCH</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h3>TWITCH</h3>
+                {twitchUser ? (
+                    <span style={{ fontSize: '0.7em', color: '#9146FF', cursor: 'pointer' }} onClick={() => setIsLoginModalOpen(true)} title="Click to update login">Logged as {twitchUser}</span>
+                ) : (
+                    <button className="filter-btn" style={{ width: 'auto', padding: '0 6px', fontSize: '0.7em' }} onClick={() => setIsLoginModalOpen(true)}>
+                        <LogIn size={10} style={{ marginRight: 4 }} /> Login
+                    </button>
+                )}
+            </div>
+            
             <div className="input-row">
                 <input
                   placeholder="Channel Name"
@@ -315,8 +437,17 @@ function App() {
             highlightTerms={[twitchChannel, youtubeVideoId].filter(Boolean)}
             thirdPartyEmotes={thirdPartyEmotes}
         />
+        {twitchConnected && twitchToken && (
+             <ChatInput onSendMessage={handleSendMessage} />
+        )}
         <UpdateNotification />
       </div>
+      
+      <LoginModal 
+        isOpen={isLoginModalOpen} 
+        onClose={() => setIsLoginModalOpen(false)} 
+        onLogin={handleLogin}
+      />
     </div>
     </>
   );

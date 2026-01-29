@@ -1,19 +1,49 @@
 use crate::models::{ChatMessage, Platform};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use twitch_irc::login::StaticLoginCredentials;
 use twitch_irc::message::ServerMessage;
 use twitch_irc::{ClientConfig, SecureTCPTransport, TwitchIRCClient};
+use std::sync::{RwLock, Mutex};
 
-pub async fn start_twitch_handler(app: AppHandle, channel: String) {
+pub struct TwitchAppState {
+    pub client: RwLock<Option<TwitchIRCClient<SecureTCPTransport, StaticLoginCredentials>>>,
+}
+
+pub async fn start_twitch_handler(
+    app: AppHandle,
+    channel: String,
+    username: Option<String>,
+    token: Option<String>,
+) {
     let channel = if channel.starts_with('#') {
         channel
     } else {
         format!("#{}", channel)
     };
 
-    let config = ClientConfig::default();
+    let config = if let (Some(u), Some(t)) = (username, token) {
+        // Strip "oauth:" because twitch_irc might prepend it, or we want to normalize.
+        // Sending "oauth:token" often results in "oauth:oauth:token" if the lib is helpful.
+        // If the lib expects "oauth:token", passing "token" might fail, but let's try this common fix first.
+        let token_clean = t.trim_start_matches("oauth:").to_string();
+        
+        eprintln!("Authenticating as user: '{}'", u);
+        eprintln!("Token clean start: '{}'", token_clean.chars().take(5).collect::<String>());
+        
+        let creds = StaticLoginCredentials::new(u, Some(token_clean));
+        ClientConfig::new_simple(creds)
+    } else {
+        eprintln!("Authenticating anonymously");
+        ClientConfig::default()
+    };
+
     let (mut incoming_messages, client) =
         TwitchIRCClient::<SecureTCPTransport, StaticLoginCredentials>::new(config);
+
+    // Store client in state
+    if let Some(state) = app.try_state::<TwitchAppState>() {
+        *state.client.write().unwrap() = Some(client.clone());
+    }
 
     let app_clone = app.clone();
     let client_handle = client.clone(); // Keep client alive by moving a clone into the task
@@ -23,7 +53,7 @@ pub async fn start_twitch_handler(app: AppHandle, channel: String) {
         let _keep_alive = client_handle;
         
         while let Some(message) = incoming_messages.recv().await {
-            eprintln!("Twitch Raw Message: {:?}", message); // Log everything
+            // eprintln!("Twitch Raw Message: {:?}", message); // Disabled global logging to reduce noise
             if let ServerMessage::Privmsg(msg) = message {
                 // Emit channel ID just in case RoomState didn't catch it or we reconnected silently
                 // Emitting generic string is fine, frontend handles dedupe
@@ -85,6 +115,10 @@ pub async fn start_twitch_handler(app: AppHandle, channel: String) {
                 }
             } else if let ServerMessage::Notice(msg) = message {
                  eprintln!("Twitch Notice: {}", msg.message_text);
+                 if msg.message_text == "Login authentication failed" {
+                     eprintln!("Emitting twitch-error due to auth failure");
+                     app_clone.emit("twitch-error", "Login authentication failed. Please check your token.").unwrap_or(());
+                 }
             } else if let ServerMessage::UserNotice(msg) = message {
                 // Handle Subs, Resubs, Raids, etc.
                 eprintln!("Twitch UserNotice: {:?}", msg);

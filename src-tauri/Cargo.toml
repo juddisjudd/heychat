@@ -1,6 +1,6 @@
 [package]
 name = "heychat"
-version = "1.0.13"
+version = "1.0.14"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -26,8 +26,13 @@ twitch-irc = { version = "5.0.1", default-features = false, features = ["transpo
 youtube_chat = "0.2.2"
 tokio = { version = "1.49.0", features = ["full"] }
 chrono = "0.4.43"
-reqwest = { version = "0.13.1", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "blocking"] }
 regex = "1.12.2"
 opener = "0.7"
 image = "0.24"
+tauri-plugin-deep-link = "2.4.6"
+sha2 = "0.10.9"
+base64 = "0.22.1"
+rand = "0.8.5"
+tauri-plugin-single-instance = "2.3.7"
 

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitch Auth Redirect</title>
+</head>
+<body>
+    <p>Redirecting to HeyChat...</p>
+    <script>
+        console.log("HeyChat Redirect Loaded");
+        
+        // Implicit Grant returns token in the HASH (#)
+        // URL: https://heychatapp.com/auth#access_token=...&scope=...
+        if (window.location.hash) {
+            const hash = window.location.hash.substring(1); // Remove '#'
+            const params = new URLSearchParams(hash);
+            const accessToken = params.get('access_token');
+            console.log("Hash params found:", hash);
+
+            if (accessToken) {
+                // Redirect to deep link
+                // We send it as a query param so the Rust backend can parse it easily
+                window.location.href = `heychat://auth?access_token=${accessToken}`;
+            } else {
+                document.body.innerText = "Error: No access_token found in hash.";
+            }
+        } else {
+             document.body.innerText = "Error: No hash fragment found (Implicit Flow required).";
+        }
+    </script>
+</body>
+</html>
