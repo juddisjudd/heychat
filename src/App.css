@@ -461,7 +461,7 @@ textarea.favorites-input {
 .message-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0 !important; /* Force 0 gap */
   margin-bottom: 4px;
   font-size: 0.9em;
 }
@@ -473,17 +473,20 @@ textarea.favorites-input {
 
 .badges {
   display: inline-flex;
-  gap: 2px;
+  gap: 3px;
   align-items: center;
+  margin-right: 5px !important; /* Spacing between icon/badges and username */
 }
 
 .username {
   font-weight: bold;
-  margin-right: 4px;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 .separator {
-  margin-right: 4px;
+  margin: 0 !important;
+  padding: 0 !important;
   color: #888;
 }
 

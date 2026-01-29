@@ -142,12 +142,7 @@ export const ChatMessageItem = ({ msg, isFavorite, highlightTerms, thirdPartyEmo
                     </svg>
                 </span>
             )}
-        </div>
-
-        <span className="username" style={{ color: msg.color || (isFavorite ? '#ffd700' : 'inherit') }}>
-            {msg.username}
-        </span>
-        <span className="separator">:</span>
+        </div><span className="username" style={{ color: msg.color || (isFavorite ? '#ffd700' : 'inherit') }}>{msg.username}</span><span className="separator">:</span>
       </div>
       
       {msg.msg_type === 'sub' && msg.system_message && (
