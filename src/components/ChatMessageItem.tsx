@@ -4,76 +4,94 @@ import { Star } from "lucide-react"; // Import necessary icons
 
 // Helper to replace text with emote images
 // Helper to replace text with emote images AND highlight mentions
-const renderMessageWithEmotes = (text: string, emotes?: Emote[], highlightTerms?: string[]) => {
-    // 1. Split by emotes first (highest priority)
-    const emoteParts: React.ReactNode[] = [];
+const renderMessageWithEmotes = (text: string, emotes?: Emote[], highlightTerms?: string[], thirdPartyEmotes?: Map<string, string>) => {
+    // 1. Split by emotes first (highest priority, Twitch/YT native)
+    let parts: React.ReactNode[] = []; // Changed to ReactNode to fix JSX error
     
-    if (!emotes || emotes.length === 0) {
-        emoteParts.push(text);
+    // Initial content is just the text
+    const initialParts: { text: string, type: 'text' | 'emote', url?: string, code?: string }[] = [{ text, type: 'text' }];
+    
+    // Sort native emotes
+    const sortedEmotes = emotes ? [...emotes].sort((a, b) => a.start - b.start) : [];
+    
+    // Process Native Emotes (Slicing style)
+    let processedNodeParts: React.ReactNode[] = [];
+    
+    if (sortedEmotes.length === 0) {
+        processedNodeParts = [text];
     } else {
-        const sortedEmotes = [...emotes].sort((a, b) => a.start - b.start);
         let lastIndex = 0;
-
         sortedEmotes.forEach(emote => {
             if (emote.start > lastIndex) {
-                emoteParts.push(text.substring(lastIndex, emote.start));
+                 processedNodeParts.push(text.substring(lastIndex, emote.start));
             }
-            
             const url = `https://static-cdn.jtvnw.net/emoticons/v2/${emote.id}/default/dark/1.0`;
-            emoteParts.push(
-                <img 
-                    key={`emote-${emote.start}-${emote.id}`}
-                    src={url} 
-                    alt={emote.code}
-                    title={emote.code}
-                    style={{ verticalAlign: 'middle', maxHeight: '28px', margin: '0 2px' }} 
-                />
+            processedNodeParts.push(
+                <img key={`emote-native-${emote.id}-${emote.start}`} src={url} alt={emote.code} title={emote.code} className="chat-emote" />
             );
             lastIndex = emote.end + 1;
         });
-
         if (lastIndex < text.length) {
-            emoteParts.push(text.substring(lastIndex));
+            processedNodeParts.push(text.substring(lastIndex));
         }
     }
 
-    // 2. Process text parts for mentions
-    // We want to highlight specific terms (channel name) AND bold any other @mentions
+    // 2. Process 3rd Party Emotes (String replacement in text nodes)
+    // Only if we have them
+    if (thirdPartyEmotes && thirdPartyEmotes.size > 0) {
+        const nextParts: React.ReactNode[] = [];
+        
+        processedNodeParts.forEach(part => {
+             if (typeof part === 'string') {
+                 // Split by spaces to find emote codes
+                 // Using regex bound by spaces or start/end of string
+                 // Note: Emote codes can be "KEKW" or ":)" or "Ah_Yes"
+                 // Simple split by space is safest for chat generally
+                 const words = part.split(/(\s+)/); // Capture spaces to preserve them
+                 
+                 words.forEach((word, idx) => {
+                     const cleanWord = word.trim();
+                     if (thirdPartyEmotes.has(cleanWord)) {
+                         const url = thirdPartyEmotes.get(cleanWord)!;
+                         nextParts.push(
+                             <img key={`emote-3p-${idx}-${cleanWord}`} src={url} alt={cleanWord} title={cleanWord} className="chat-emote" />
+                         );
+                     } else {
+                         nextParts.push(word);
+                     }
+                 });
+             } else {
+                 nextParts.push(part);
+             }
+        });
+        processedNodeParts = nextParts;
+    }
+
+    // 3. Process Mentions (String replacement in text nodes)
     const cleanHighlightTerms = (highlightTerms || [])
         .map(t => t.trim().replace(/^@/, '').toLowerCase())
         .filter(t => t.length > 0);
 
-    // Regex to find ANY string starting with @ followed by word characters
-    // (?:) non-capturing group not needed for the whole thing if we want to capture the mention itself
     const generalMentionRegex = /(@[\w]+)(?![\w])/gi;
 
-    return emoteParts.map((part, index) => {
+    return processedNodeParts.map((part, index) => {
         if (typeof part !== 'string') return part;
+
+        // Skip if whitespace only (optimization)
+        if (!part.trim()) return part;
 
         const split = part.split(generalMentionRegex);
         if (split.length === 1) return part;
 
         return (
-            <span key={`part-${index}`}>
+            <span key={`mention-part-${index}`}>
                 {split.map((chunk, i) => {
-                    // Check if chunk matches the basic mention structure
-                    if (chunk.match(generalMentionRegex)) {
+                     if (chunk.match(generalMentionRegex)) {
                         const cleanChunk = chunk.replace(/^@/, '').toLowerCase();
-                        
-                        // Check if it's a specific highlight term (Channel Mention)
                         if (cleanHighlightTerms.includes(cleanChunk)) {
-                            return (
-                                <span key={i} style={{ color: '#ffff00', fontWeight: 'bold' }}>
-                                    {chunk}
-                                </span>
-                            );
+                            return <span key={i} className="mention-highlight">{chunk}</span>;
                         } else {
-                            // Generic Mention (Bold only)
-                            return (
-                                <span key={i} style={{ fontWeight: 'bold' }}>
-                                    {chunk}
-                                </span>
-                            );
+                            return <span key={i} className="mention-bold">{chunk}</span>;
                         }
                     }
                     return chunk;
@@ -87,9 +105,10 @@ interface Props {
   msg: ChatMessage;
   isFavorite: boolean;
   highlightTerms: string[];
+  thirdPartyEmotes?: Map<string, string>;
 }
 
-export const ChatMessageItem = ({ msg, isFavorite, highlightTerms }: Props) => {
+export const ChatMessageItem = ({ msg, isFavorite, highlightTerms, thirdPartyEmotes }: Props) => {
   const isMod = msg.is_mod;
   const isVip = msg.is_vip;
 
@@ -144,7 +163,7 @@ export const ChatMessageItem = ({ msg, isFavorite, highlightTerms }: Props) => {
       {/* Only render message text if it exists (for subs it might be empty if they didn't type anything) */}
       {msg.message && (
           <div className="text" style={{ wordBreak: "break-word" }}>
-            {renderMessageWithEmotes(msg.message, msg.emotes, highlightTerms)}
+            {renderMessageWithEmotes(msg.message, msg.emotes, highlightTerms, thirdPartyEmotes)}
           </div>
       )}
     </div>

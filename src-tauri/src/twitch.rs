@@ -25,7 +25,10 @@ pub async fn start_twitch_handler(app: AppHandle, channel: String) {
         while let Some(message) = incoming_messages.recv().await {
             eprintln!("Twitch Raw Message: {:?}", message); // Log everything
             if let ServerMessage::Privmsg(msg) = message {
-                // ... processing ...
+                // Emit channel ID just in case RoomState didn't catch it or we reconnected silently
+                // Emitting generic string is fine, frontend handles dedupe
+                app_clone.emit("twitch-connected", msg.channel_id.clone()).unwrap_or(());
+
                 eprintln!("Twitch msg received from: {}", msg.sender.name);
                 let is_mod = msg.badges.iter().any(|b| b.name == "moderator");
                 let is_vip = msg.badges.iter().any(|b| b.name == "vip");
@@ -90,6 +93,13 @@ pub async fn start_twitch_handler(app: AppHandle, channel: String) {
                 let user_text = msg.message_text.unwrap_or_default();
                 let sender_name = msg.sender.name; // User who subbed
 
+                let emotes = msg.emotes.iter().map(|e| crate::models::Emote {
+                    id: e.id.clone(),
+                    code: e.code.clone(),
+                    start: e.char_range.start,
+                    end: e.char_range.end,
+                }).collect();
+
                 // Always emit UserNotice (Sub/Resub)
                  let chat_message = ChatMessage {
                     id: msg.source.tags.0.get("id").and_then(|s| s.clone()).unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
@@ -102,11 +112,17 @@ pub async fn start_twitch_handler(app: AppHandle, channel: String) {
                     is_vip: false,
                     is_member: false,
                     timestamp: chrono::Local::now().to_rfc3339(),
-                    emotes: vec![], // Emotes in system msg? tricky.
+                    emotes,
                     msg_type: "sub".to_string(),
                     system_message: Some(system_msg),
                 };
                 app_clone.emit("chat-message", chat_message).unwrap_or(());
+            } else if let ServerMessage::RoomState(msg) = message {
+                 // Emit channel ID for 3rd party emotes fetching
+                 if let Some(room_id) = msg.source.tags.0.get("room-id").and_then(|s: &Option<String>| s.clone()) {
+                     eprintln!("Twitch RoomState: room-id={}", room_id);
+                     app_clone.emit("twitch-connected", room_id).unwrap_or(());
+                 }
             } else if let ServerMessage::Join(msg) = message {
                  eprintln!("Twitch Joined: {}", msg.channel_login);
             }

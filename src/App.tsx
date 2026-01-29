@@ -9,6 +9,8 @@ import { ChatList } from "./components/ChatList";
 import TitleBar from "./components/TitleBar";
 import "./App.css";
 
+import { fetchThirdPartyEmotes, EmoteMap } from "./utils/emotes";
+
 const COMMON_BOTS = ['streamlabs', 'streamelements', 'moobot', 'nightbot', 'fossabot', 'soundalerts'];
 
 function App() {
@@ -23,28 +25,33 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'TWITCH' | 'YOUTUBE' | 'VIP' | 'MOD'>('ALL');
   const [hideBots, setHideBots] = useState(false);
+  const [thirdPartyEmotes, setThirdPartyEmotes] = useState<EmoteMap>(new Map());
 
-  // Check for updates on mount
+  // Check for updates
+  const checkForUpdates = async (manual: boolean = false) => {
+      try {
+          if (manual) console.log("Checking for updates...");
+          const update = await check();
+          if (update?.available) {
+              console.log(`Update to ${update.version} available!`);
+              await update.downloadAndInstall();
+              alert(`Update to v${update.version} installed. Please restart HeyChat to apply.`);
+          } else if (manual) {
+              alert("You are on the latest version!");
+          }
+      } catch (error) {
+          console.error("Update check failed:", error);
+          if (manual) alert(`Update check failed: ${error}`);
+      }
+  };
+
   useEffect(() => {
-    const checkForUpdates = async () => {
-        try {
-            const update = await check();
-            if (update?.available) {
-                console.log(`Update to ${update.version} available!`);
-                await update.downloadAndInstall();
-                // Notify user to restart
-                alert(`Update to v${update.version} installed. Please restart HeyChat to apply.`);
-            }
-        } catch (error) {
-            console.error("Update check failed (this is expected in dev mode):", error);
-        }
-    };
-    
     checkForUpdates();
   }, []);
 
   // Load settings from localStorage on mount
   useEffect(() => {
+    // ... localStorage loading ...
     getVersion().then(setAppVersion);
     
     const savedTwitch = localStorage.getItem("heychat_twitch_channel");
@@ -76,11 +83,13 @@ function App() {
   }, [favoritesInput]);
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
+    let unlistenChat: (() => void) | undefined;
+    let unlistenTwitch: (() => void) | undefined;
     let unmounted = false;
 
     const setupListeners = async () => {
-      const unlistenFn = await listen<ChatMessage>("chat-message", (event) => {
+      // 1. Chat Messages
+      unlistenChat = await listen<ChatMessage>("chat-message", (event) => {
           console.log("Frontend received event:", event);
           setMessages((prev) => {
               if (prev.some(m => m.id === event.payload.id)) return prev;
@@ -88,20 +97,21 @@ function App() {
           }); 
       });
 
-      if (unmounted) {
-        unlistenFn();
-      } else {
-        unlisten = unlistenFn;
-      }
+      // 2. Twitch Connection Info (Emote Loading)
+      unlistenTwitch = await listen<string>("twitch-connected", async (event) => {
+          console.log("Twitch connected, fetching emotes for channel ID:", event.payload);
+          const channelId = event.payload;
+          const emotes = await fetchThirdPartyEmotes(channelId);
+          setThirdPartyEmotes(emotes);
+      });
     };
     
     setupListeners();
 
     return () => {
       unmounted = true;
-      if (unlisten) {
-        unlisten();
-      }
+      if (unlistenChat) unlistenChat();
+      if (unlistenTwitch) unlistenTwitch();
     };
   }, []);
 
@@ -227,7 +237,14 @@ function App() {
                 <span>Open Source</span>
             </div>
             <span className="footer-separator">|</span>
-            <span className="version-text">v{appVersion}</span>
+            <span 
+                className="version-text clickable" 
+                onClick={() => checkForUpdates(true)}
+                title="Click to Check for Updates"
+                style={{ cursor: 'pointer', textDecoration: 'underline' }}
+            >
+                v{appVersion}
+            </span>
           </div>
         </div>
       </div>
@@ -311,6 +328,7 @@ function App() {
             messages={filteredMessages} 
             favorites={favoriteUsers} 
             highlightTerms={[twitchChannel, youtubeVideoId].filter(Boolean)}
+            thirdPartyEmotes={thirdPartyEmotes}
         />
       </div>
     </div>

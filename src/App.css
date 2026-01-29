@@ -487,6 +487,21 @@ textarea.favorites-input {
   color: #888;
 }
 
+.chat-emote {
+    vertical-align: middle;
+    max-height: 28px;
+    margin: 0 2px;
+}
+
+.mention-highlight {
+    color: #ffff00;
+    font-weight: bold;
+}
+
+.mention-bold {
+    font-weight: bold;
+}
+
 .text {
   color: #ddd;
 }
