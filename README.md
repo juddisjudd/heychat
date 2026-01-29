@@ -1,6 +1,6 @@
 # HeyChat
 
-A minimal, always-on-top chat overlay for streamers that aggregates messages from Twitch and YouTube Live. Built with Tauri and React.
+A minimal, chat app for streamers that aggregates messages from Twitch and YouTube Live.
 
 ![heychat_2PJVyRfvjQ](https://github.com/user-attachments/assets/e841e58f-1b50-4c13-9326-ddc7491244a1)
 
