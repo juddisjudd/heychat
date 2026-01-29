@@ -66,13 +66,14 @@ jobs:
           releaseBody: 'See the assets to download this version and install.'
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} --verbose
 
-      - name: Debug - List target directory
+      - name: Debug - Check Secrets & Targets
         if: always()
         shell: bash
         run: |
-          find src-tauri/target -name "latest.json" || echo "latest.json not found via find"
+          echo "Secret Key Present: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}"
+          echo "Listing target dir:"
           ls -R src-tauri/target/release/bundle || echo "Bundle dir not found"
 
       - name: Upload updater artifact (latest.json)

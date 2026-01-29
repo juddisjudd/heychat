@@ -194,13 +194,57 @@ pub async fn start_youtube_handler(app: AppHandle, video_id: String) {
                                 let author_name = item.pointer("/authorName/simpleText").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
                                 
                                 let mut message_text = String::new();
+                                let mut emotes = Vec::new();
+
                                 if let Some(runs) = item.pointer("/message/runs").and_then(|v| v.as_array()) {
                                     for run in runs {
                                         if let Some(text) = run["text"].as_str() {
                                             message_text.push_str(text);
-                                        }
-                                        if let Some(emoji) = run.pointer("/emoji/emojiId").and_then(|v| v.as_str()) {
-                                            message_text.push_str(emoji); // incomplete but better than nothing
+                                        } else if let Some(emoji_node) = run.pointer("/emoji") {
+                                            // Handle Emoji
+                                            let mut emoji_text = "".to_string();
+                                            
+                                            // 1. Try to find a shortcut (e.g. :cat:) to use as text representation
+                                            if let Some(shortcuts) = emoji_node.pointer("/shortcuts").and_then(|v| v.as_array()) {
+                                                if let Some(first) = shortcuts.first().and_then(|v| v.as_str()) {
+                                                    emoji_text = first.to_string();
+                                                }
+                                            }
+                                            
+                                            // Fallback to emojiId if no shortcut
+                                            if emoji_text.is_empty() {
+                                                if let Some(id) = emoji_node["emojiId"].as_str() {
+                                                    emoji_text = id.to_string();
+                                                }
+                                            }
+
+                                            // 2. Get the Image URL
+                                            let mut image_url = "".to_string();
+                                            if let Some(thumbnails) = emoji_node.pointer("/image/thumbnails").and_then(|v| v.as_array()) {
+                                                 // Usually the last one is biggest? Or first? checking 0 is usually fine for chat
+                                                 if let Some(url) = thumbnails.first().and_then(|t| t["url"].as_str()) {
+                                                     image_url = url.to_string();
+                                                 }
+                                            }
+
+                                            if !emoji_text.is_empty() {
+                                                // Frontend/JS usually uses simple string index (UTF-16) or similar.
+                                                // Rust string len is bytes.
+                                                // For simple emojis and text, we will use bytes for now as a proxy.
+                                                let start_index = message_text.len(); 
+                                                
+                                                message_text.push_str(&emoji_text);
+                                                
+                                                if !image_url.is_empty() {
+                                                    use crate::models::Emote;
+                                                    emotes.push(Emote {
+                                                        id: image_url,
+                                                        code: emoji_text.clone(),
+                                                        start: start_index, // This is technically BYTE offset. 
+                                                        end: start_index + emoji_text.len() - 1,
+                                                    });
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -240,7 +284,7 @@ pub async fn start_youtube_handler(app: AppHandle, video_id: String) {
                                     is_vip,
                                     is_member,
                                     timestamp: chrono::Local::now().to_rfc3339(),
-                                    emotes: vec![],
+                                    emotes,
                                     msg_type: "chat".to_string(),
                                     system_message: None,
                                 };

@@ -21,7 +21,9 @@ const renderMessageWithEmotes = (text: string, emotes?: Emote[], highlightTerms?
             if (emote.start > lastIndex) {
                  processedNodeParts.push(text.substring(lastIndex, emote.start));
             }
-            const url = `https://static-cdn.jtvnw.net/emoticons/v2/${emote.id}/default/dark/1.0`;
+            const url = emote.id.startsWith('http') 
+                ? emote.id 
+                : `https://static-cdn.jtvnw.net/emoticons/v2/${emote.id}/default/dark/1.0`;
             processedNodeParts.push(
                 <img key={`emote-native-${emote.id}-${emote.start}`} src={url} alt={emote.code} title={emote.code} className="chat-emote" />
             );

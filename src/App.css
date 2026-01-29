@@ -576,3 +576,26 @@ textarea.favorites-input {
     border-color: #663333;
     background-color: #2a1111;
 }
+
+.scroll-pause-indicator {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(145, 70, 255, 0.9); /* Twitch Purple-ish */
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    z-index: 100;
+    transition: all 0.2s;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.scroll-pause-indicator:hover {
+    background-color: #a970ff;
+    transform: translateX(-50%) translateY(-2px);
+}
