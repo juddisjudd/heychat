@@ -3,7 +3,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use twitch_irc::login::StaticLoginCredentials;
 use twitch_irc::message::ServerMessage;
 use twitch_irc::{ClientConfig, SecureTCPTransport, TwitchIRCClient};
-use std::sync::{RwLock, Mutex};
+use std::sync::RwLock;
 
 pub struct TwitchAppState {
     pub client: RwLock<Option<TwitchIRCClient<SecureTCPTransport, StaticLoginCredentials>>>,

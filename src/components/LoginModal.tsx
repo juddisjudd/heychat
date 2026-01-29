@@ -54,7 +54,7 @@ export function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps) {
             </div>
             
             <p style={{ marginTop: '15px', fontSize: '0.85em', opacity: 0.6, textAlign: 'center' }}>
-                We use secure OAuth (PKCE) to protect your account.
+                We use secure OAuth to protect your account.
                 The app never sees your password.
             </p>
         </div>
