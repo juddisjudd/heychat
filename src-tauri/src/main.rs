@@ -33,7 +33,6 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let icon_content = include_bytes!("../icons/icon.png");
             let icon_image = image::load_from_memory(icon_content).expect("failed to load icon");

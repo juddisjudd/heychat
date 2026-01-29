@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { check } from "@tauri-apps/plugin-updater";
 import { getVersion } from "@tauri-apps/api/app";
 import { Eraser, Search as SearchIcon, Github, Heart, Shield, Bot } from "lucide-react";
 import { ChatMessage } from "./types";
 import { ChatList } from "./components/ChatList";
 import TitleBar from "./components/TitleBar";
+import { UpdateNotification } from "./components/UpdateNotification";
 import "./App.css";
 
 import { fetchThirdPartyEmotes, EmoteMap } from "./utils/emotes";
@@ -26,28 +26,6 @@ function App() {
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'TWITCH' | 'YOUTUBE' | 'VIP' | 'MOD'>('ALL');
   const [hideBots, setHideBots] = useState(false);
   const [thirdPartyEmotes, setThirdPartyEmotes] = useState<EmoteMap>(new Map());
-
-  // Check for updates
-  const checkForUpdates = async (manual: boolean = false) => {
-      try {
-          if (manual) console.log("Checking for updates...");
-          const update = await check();
-          if (update?.available) {
-              console.log(`Update to ${update.version} available!`);
-              await update.downloadAndInstall();
-              alert(`Update to v${update.version} installed. Please restart HeyChat to apply.`);
-          } else if (manual) {
-              alert("You are on the latest version!");
-          }
-      } catch (error) {
-          console.error("Update check failed:", error);
-          if (manual) alert(`Update check failed: ${error}`);
-      }
-  };
-
-  useEffect(() => {
-    checkForUpdates();
-  }, []);
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -124,6 +102,15 @@ function App() {
     await invoke("join_youtube", { videoId: youtubeVideoId });
     setYoutubeConnected(true);
   }
+  
+  const openReleasesPage = async () => {
+      try {
+          await invoke('open_link', { url: 'https://github.com/juddisjudd/heychat/releases' });
+      } catch (e) {
+           console.error("Failed to open URL:", e);
+           window.open('https://github.com/juddisjudd/heychat/releases', '_blank');
+      }
+  };
 
   const favoriteUsers = favoritesInput.split("\n").map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
   
@@ -237,8 +224,8 @@ function App() {
             <span className="footer-separator">|</span>
             <span 
                 className="version-text clickable" 
-                onClick={() => checkForUpdates(true)}
-                title="Click to Check for Updates"
+                onClick={openReleasesPage}
+                title="Click to View Releases"
                 style={{ cursor: 'pointer', textDecoration: 'underline' }}
             >
                 v{appVersion}
@@ -328,6 +315,7 @@ function App() {
             highlightTerms={[twitchChannel, youtubeVideoId].filter(Boolean)}
             thirdPartyEmotes={thirdPartyEmotes}
         />
+        <UpdateNotification />
       </div>
     </div>
     </>

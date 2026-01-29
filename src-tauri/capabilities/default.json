@@ -10,7 +10,6 @@
     "core:window:allow-maximize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
-    "core:window:allow-start-dragging",
-    "updater:default"
+    "core:window:allow-start-dragging"
   ]
 }
