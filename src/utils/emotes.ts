@@ -122,8 +122,7 @@ export const fetchThirdPartyEmotes = async (channelId: string): Promise<EmoteMap
     try {
         const resp = await fetch('https://7tv.io/v3/emote-sets/global');
         if (resp.ok) {
-           const data: SevenTVUserResponse['emote_set'] = await resp.json(); // It returns an emote set directly or similar structure?
-           // Actually v3 global returns { id, name, emotes: [...] }
+           // x.x.x
            const globalData = await resp.json();
            if (globalData.emotes) {
                globalData.emotes.forEach((e: any) => { // Use 'any' or defined type, reusing existing logic

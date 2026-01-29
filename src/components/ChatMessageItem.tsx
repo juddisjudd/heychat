@@ -6,10 +6,6 @@ import { Star } from "lucide-react"; // Import necessary icons
 // Helper to replace text with emote images AND highlight mentions
 const renderMessageWithEmotes = (text: string, emotes?: Emote[], highlightTerms?: string[], thirdPartyEmotes?: Map<string, string>) => {
     // 1. Split by emotes first (highest priority, Twitch/YT native)
-    let parts: React.ReactNode[] = []; // Changed to ReactNode to fix JSX error
-    
-    // Initial content is just the text
-    const initialParts: { text: string, type: 'text' | 'emote', url?: string, code?: string }[] = [{ text, type: 'text' }];
     
     // Sort native emotes
     const sortedEmotes = emotes ? [...emotes].sort((a, b) => a.start - b.start) : [];

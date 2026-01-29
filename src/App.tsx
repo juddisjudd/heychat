@@ -85,7 +85,6 @@ function App() {
   useEffect(() => {
     let unlistenChat: (() => void) | undefined;
     let unlistenTwitch: (() => void) | undefined;
-    let unmounted = false;
 
     const setupListeners = async () => {
       // 1. Chat Messages
@@ -109,7 +108,6 @@ function App() {
     setupListeners();
 
     return () => {
-      unmounted = true;
       if (unlistenChat) unlistenChat();
       if (unlistenTwitch) unlistenTwitch();
     };
