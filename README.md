@@ -9,7 +9,6 @@ A minimal, chat app for streamers that aggregates messages from Twitch and YouTu
 
 - **Multi-Platform Support**: Connects to Twitch and YouTube Live simultaneously.
 - **Customizable UI**: Dark mode, custom title bar, and a compact overlay design.
-- **Always on Top**: Designed to float over your game or creative software.
 - **Chat Controls**: Filter messages by username or clear the chat instantly.
 - **Emote Support**: Renders Twitch emotes natively.
 
