@@ -90,6 +90,7 @@ pub async fn start_youtube_handler(app: AppHandle, video_id: String) {
     };
 
     eprintln!("Starting YouTube chat for video: {}", video_id_clean);
+    app_clone.emit("youtube-connected", &video_id_clean).unwrap_or(());
 
     // Reuse client? Or just make new one. The simple polling logic makes a new one.
     // But we already have one. Let's reuse 'client' if possible, or just shadow it/ignore.
@@ -106,6 +107,9 @@ pub async fn start_youtube_handler(app: AppHandle, video_id: String) {
             return;
         }
     };
+
+    // ... (rest of function) ...
+
 
     // 3. Extract API Key
     let api_key_regex = Regex::new(r#""INNERTUBE_API_KEY":"([^"]+)""#).unwrap();
@@ -318,4 +322,76 @@ pub async fn start_youtube_handler(app: AppHandle, video_id: String) {
         
         tokio::time::sleep(Duration::from_secs(1)).await; // Polling interval
     }
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct VideoListResponse {
+    items: Vec<VideoItem>,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct VideoItem {
+    #[serde(rename = "liveStreamingDetails")]
+    live_streaming_details: Option<LiveStreamingDetails>,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct LiveStreamingDetails {
+    #[serde(rename = "activeLiveChatId")]
+    active_live_chat_id: Option<String>,
+}
+
+#[tauri::command]
+pub async fn send_youtube_message(video_id: String, message: String, token: String) -> Result<(), String> {
+    let client = Client::new();
+
+    // 1. Get Live Chat ID
+    let list_url = format!("https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={}", video_id);
+    
+    let resp = client.get(&list_url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !resp.status().is_success() {
+         let txt = resp.text().await.unwrap_or_default();
+         return Err(format!("Failed to get video details: {}", txt));
+    }
+
+    let list_data: VideoListResponse = resp.json().await.map_err(|e| e.to_string())?;
+    
+    let chat_id = list_data.items.first()
+        .and_then(|i| i.live_streaming_details.as_ref())
+        .and_then(|d| d.active_live_chat_id.as_ref())
+        .ok_or("No active live chat found. Is the stream live?")?;
+
+    eprintln!("Found Live Chat ID: {}", chat_id);
+
+    // 2. Post Message
+    let url = "https://www.googleapis.com/youtube/v3/liveChatMessages?part=snippet";
+    
+    let body = serde_json::json!({
+        "snippet": {
+            "liveChatId": chat_id,
+            "type": "textMessageEvent",
+            "textMessageDetails": {
+                "messageText": message
+            }
+        }
+    });
+
+    let post_resp = client.post(url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !post_resp.status().is_success() {
+        let txt = post_resp.text().await.unwrap_or_default();
+        return Err(format!("Failed to send message: {}", txt));
+    }
+
+    Ok(())
 }

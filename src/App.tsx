@@ -22,6 +22,7 @@ function App() {
   const [twitchConnected, setTwitchConnected] = useState(false);
   const [youtubeConnected, setYoutubeConnected] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [favoritesInput, setFavoritesInput] = useState("");
   const [appVersion, setAppVersion] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -29,8 +30,14 @@ function App() {
   const [hideBots, setHideBots] = useState(false);
   const [thirdPartyEmotes, setThirdPartyEmotes] = useState<EmoteMap>(new Map());
 
+  // YouTube Auth
+  const [youtubeToken, setYoutubeToken] = useState("");
+  const [youtubeUser, setYoutubeUser] = useState("");
+  
+  // Chat Sending Provider
+  const [chatProvider, setChatProvider] = useState<'twitch' | 'youtube'>('twitch');
+  
   // Twitch Auth
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [twitchUser, setTwitchUser] = useState("");
   const [twitchToken, setTwitchToken] = useState("");
 
@@ -45,6 +52,8 @@ function App() {
     const savedFavorites = localStorage.getItem("heychat_favorites");
     const savedTwitchUser = localStorage.getItem("heychat_twitch_username");
     const savedTwitchToken = localStorage.getItem("heychat_twitch_token");
+    const savedYoutubeUser = localStorage.getItem("heychat_youtube_username");
+    const savedYoutubeToken = localStorage.getItem("heychat_youtube_token");
 
     if (savedTwitch) setTwitchChannel(savedTwitch);
     if (savedYoutube) setYoutubeVideoId(savedYoutube);
@@ -52,34 +61,28 @@ function App() {
     if (savedFavorites) setFavoritesInput(savedFavorites);
     if (savedTwitchUser) setTwitchUser(savedTwitchUser);
     if (savedTwitchToken) setTwitchToken(savedTwitchToken);
+    if (savedYoutubeUser) setYoutubeUser(savedYoutubeUser);
+    if (savedYoutubeToken) setYoutubeToken(savedYoutubeToken);
   }, []);
 
   // Save settings when they change
   useEffect(() => {
     localStorage.setItem("heychat_twitch_channel", twitchChannel);
-  }, [twitchChannel]);
-
-  useEffect(() => {
     localStorage.setItem("heychat_youtube_id", youtubeVideoId);
-  }, [youtubeVideoId]);
-
-  useEffect(() => {
     localStorage.setItem("heychat_sidebar_open", String(isSidebarOpen));
-  }, [isSidebarOpen]);
-
-  useEffect(() => {
     localStorage.setItem("heychat_favorites", favoritesInput);
-  }, [favoritesInput]);
-
-  useEffect(() => {
-      localStorage.setItem("heychat_twitch_username", twitchUser);
-      localStorage.setItem("heychat_twitch_token", twitchToken);
-  }, [twitchUser, twitchToken]);
+    localStorage.setItem("heychat_twitch_username", twitchUser);
+    localStorage.setItem("heychat_twitch_token", twitchToken);
+    localStorage.setItem("heychat_youtube_username", youtubeUser);
+    localStorage.setItem("heychat_youtube_token", youtubeToken);
+  }, [twitchChannel, youtubeVideoId, isSidebarOpen, favoritesInput, twitchUser, twitchToken, youtubeUser, youtubeToken]);
 
   useEffect(() => {
     let unlistenChat: (() => void) | undefined;
     let unlistenTwitch: (() => void) | undefined;
     let unlistenTwitchError: (() => void) | undefined;
+    let unlistenAuth: (() => void) | undefined;
+    let unlistenYoutube: (() => void) | undefined;
 
     const setupListeners = async () => {
       // 1. Chat Messages
@@ -97,42 +100,68 @@ function App() {
           const channelId = event.payload;
           const emotes = await fetchThirdPartyEmotes(channelId);
           setThirdPartyEmotes(emotes);
-          setTwitchConnected(true); // Ensure connected state is verified
+          setTwitchConnected(true); 
       });
 
-      // 3. Twitch Error (Auth Failure)
+      // 3. YouTube Connection Info (Resolved ID)
+      unlistenYoutube = await listen<string>("youtube-connected", (event) => {
+         console.log("YouTube connected, resolved ID:", event.payload);
+         setYoutubeVideoId(event.payload);
+         setYoutubeConnected(true);
+      });
+
+      // 4. Twitch Error (Auth Failure)
       unlistenTwitchError = await listen<string>("twitch-error", (event) => {
           console.error("Twitch Error:", event.payload);
           setTwitchConnected(false);
           alert(`Twitch Error: ${event.payload}`);
       });
 
-      // 4. OAuth Token Received (Auto Login)
-      await listen<string>("twitch-token-received", async (event) => {
+      // 5. Auth Token Received (Generic)
+      unlistenAuth = await listen<string>("auth-token-received", async (event) => {
           const token = event.payload;
-          console.log("OAuth token received, fetching user info...");
+          const provider = localStorage.getItem("pending_auth_provider");
+          console.log(`Auth token received for provider: ${provider}`);
           
-          try {
-             // We need to fetch the username associated with this token
-             const res = await fetch('https://api.twitch.tv/helix/users', {
-                 headers: {
-                     'Authorization': `Bearer ${token}`,
-                     'Client-Id': 'j07v9449bxjpfqx1msfnceaol2uwhx'
+          if (provider === 'twitch') {
+              try {
+                 const res = await fetch('https://api.twitch.tv/helix/users', {
+                     headers: {
+                         'Authorization': `Bearer ${token}`,
+                         'Client-Id': 'j07v9449bxjpfqx1msfnceaol2uwhx'
+                     }
+                 });
+                 if (!res.ok) throw new Error('Failed to fetch Twitch user info');
+                 const data = await res.json();
+                 const user = data.data[0]?.login;
+                 if (user) {
+                     setTwitchUser(user);
+                     setTwitchToken(token);
+                     alert(`Logged in as ${user} (Twitch)`);
                  }
-             });
-             
-             if (!res.ok) throw new Error('Failed to fetch user info');
-             const data = await res.json();
-             const user = data.data[0]?.login;
-             
-             if (user) {
-                 handleLogin(user, token);
-                 setIsLoginModalOpen(false); // Close modal if open
-             }
-          } catch (e) {
-              console.error("Auto-login failed:", e);
-              alert("Auto-login failed: " + String(e));
+              } catch (e) {
+                  alert("Twitch login failed: " + String(e));
+              }
+          } else if (provider === 'youtube') {
+              try {
+                  const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                      headers: { 'Authorization': `Bearer ${token}` }
+                  });
+                  if (!res.ok) throw new Error('Failed to fetch Google user info');
+                  const data = await res.json();
+                  const user = data.name || data.email;
+                  if (user) {
+                      setYoutubeUser(user);
+                      setYoutubeToken(token);
+                      alert(`Logged in as ${user} (YouTube)`);
+                  }
+              } catch (e) {
+                   alert("YouTube login failed: " + String(e));
+              }
           }
+          
+          setIsLoginModalOpen(false);
+          localStorage.removeItem("pending_auth_provider");
       });
     };
     
@@ -141,7 +170,9 @@ function App() {
     return () => {
       if (unlistenChat) unlistenChat();
       if (unlistenTwitch) unlistenTwitch();
+      if (unlistenYoutube) unlistenYoutube();
       if (unlistenTwitchError) unlistenTwitchError();
+      if (unlistenAuth) unlistenAuth();
     };
   }, []);
 
@@ -166,19 +197,17 @@ function App() {
   }
 
   async function handleSendMessage(message: string) {
-      if (twitchConnected && twitchToken) {
-           // Try to find user's color from previous messages
+      if (chatProvider === 'twitch' && twitchConnected && twitchToken) {
+           // ... (Twitch Logic) ...
            const existingMsg = messages.find(m => m.username.toLowerCase() === twitchUser.toLowerCase());
            const userColor = existingMsg?.color || '#9146FF';
-
-           // Optimistic Update: Show message immediately
            const tempMessage: ChatMessage = {
-               id: `local-${Date.now()}`,
+               id: `local-twitch-${Date.now()}`,
                platform: 'Twitch',
                username: twitchUser,
                message: message,
                color: userColor,
-               badges: existingMsg?.badges || [], // Also try to reuse badges
+               badges: existingMsg?.badges || [],
                is_mod: existingMsg?.is_mod || false,
                is_vip: existingMsg?.is_vip || false,
                is_member: false,
@@ -187,69 +216,101 @@ function App() {
                msg_type: 'chat',
                system_message: undefined
            };
-
            setMessages(prev => [...prev.slice(-200), tempMessage]);
 
            try {
-               await invoke("send_twitch_message", { 
-                   channel: twitchChannel, 
-                   message 
+               await invoke("send_twitch_message", { channel: twitchChannel, message });
+           } catch (e) {
+               console.error("Failed to send Twitch message:", e);
+               alert("Failed to send Twitch message: " + String(e));
+           }
+
+      } else if (chatProvider === 'youtube' && youtubeConnected && youtubeToken) {
+           // YouTube Logic
+           const tempMessage: ChatMessage = {
+               id: `local-yt-${Date.now()}`,
+               platform: 'YouTube',
+               username: youtubeUser,
+               message: message,
+               color: '#FF0000', // YouTube Red Default
+               badges: [],
+               is_mod: false, // Can't easily know yet
+               is_vip: false,
+               is_member: false,
+               timestamp: new Date().toISOString(),
+               emotes: [], // Handling emojis locally is hard, skipping for optimistic
+               msg_type: 'chat',
+               system_message: undefined
+           };
+           setMessages(prev => [...prev.slice(-200), tempMessage]);
+
+           try {
+               await invoke("send_youtube_message", { 
+                   videoId: youtubeVideoId, // Must be the resolved one! handled by connection updates
+                   message, 
+                   token: youtubeToken 
                });
            } catch (e) {
-               console.error("Failed to send message:", e);
-               // Optional: Show error state on the message?
-               alert("Failed to send message: " + String(e));
+               console.error("Failed to send YouTube message:", e);
+               alert("Failed to send YouTube message: " + String(e)); 
            }
       }
   }
-  
+
+  const toggleFilter = (filter: 'ALL' | 'TWITCH' | 'YOUTUBE' | 'VIP' | 'MOD') => {
+      if (activeFilter === filter) setActiveFilter('ALL');
+      else setActiveFilter(filter);
+  };
+
   const openReleasesPage = async () => {
-      try {
-          await invoke('open_link', { url: 'https://github.com/juddisjudd/heychat/releases' });
-      } catch (e) {
-           console.error("Failed to open URL:", e);
+       try {
+           await invoke('open_link', { url: 'https://github.com/juddisjudd/heychat/releases' });
+       } catch (e) {
+           console.error("Failed to open releases:", e);
            window.open('https://github.com/juddisjudd/heychat/releases', '_blank');
-      }
+       }
   };
-
-  const favoriteUsers = favoritesInput.split("\n").map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
   
+  // ... (rest) ...
+  
+  // Update UI to toggle providers
+  // Inside return (before ChatInput)
+  
+  const canSendTwitch = twitchConnected && !!twitchToken;
+  const canSendYoutube = youtubeConnected && !!youtubeToken;
+  
+  // Auto-switch provider if one becomes available/unavailable
+  useEffect(() => {
+      if (canSendTwitch && !canSendYoutube) setChatProvider('twitch');
+      else if (!canSendTwitch && canSendYoutube) setChatProvider('youtube');
+  }, [canSendTwitch, canSendYoutube]);
+
+  // Filter Logic
+  const favoriteUsers = favoritesInput
+    .split('\n')
+    .map(u => u.trim())
+    .filter(Boolean)
+    .map(u => u.toLowerCase());
+
   const filteredMessages = messages.filter(msg => {
-      // 1. Bot Filter (Highest priority exclusion)
-      if (hideBots && COMMON_BOTS.includes(msg.username.toLowerCase())) {
-          return false;
-      }
+    // 1. Search filter
+    if (searchQuery && !msg.username.toLowerCase().includes(searchQuery.toLowerCase()) && !msg.message.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+    }
 
-      // 2. Search Query
-      if (searchQuery && !msg.username.toLowerCase().includes(searchQuery.toLowerCase())) {
-          return false;
-      }
+    // 2. Platform filter
+    if (activeFilter === 'TWITCH' && msg.platform !== 'Twitch') return false;
+    if (activeFilter === 'YOUTUBE' && msg.platform !== 'YouTube') return false;
+    
+    // 3. Role filter
+    if (activeFilter === 'VIP' && !msg.is_vip) return false;
+    if (activeFilter === 'MOD' && !msg.is_mod) return false;
 
-      // 3. Quick Filters
-      switch (activeFilter) {
-          case 'TWITCH': return msg.platform === 'Twitch';
-          case 'YOUTUBE': return msg.platform === 'YouTube';
-          case 'VIP': return msg.is_vip;
-          case 'MOD': return msg.is_mod;
-          case 'ALL': default: return true;
-      }
+    // 4. Bot filter
+    if (hideBots && COMMON_BOTS.includes(msg.username.toLowerCase())) return false;
+
+    return true;
   });
-
-  const toggleFilter = (filter: typeof activeFilter) => {
-      setActiveFilter(prev => prev === filter ? 'ALL' : filter);
-  };
-
-  const handleLogin = (user: string, token: string) => {
-      setTwitchUser(user);
-      setTwitchToken(token);
-      
-      if (twitchConnected) {
-          setTwitchConnected(false);
-          alert(`Logged in as ${user}. Please click "Connect" again to use your new credentials.`);
-      } else {
-          alert(`Logged in as ${user}. Ready to connect.`);
-      }
-  };
 
   return (
     <>
@@ -296,7 +357,16 @@ function App() {
           </div>
 
           <div className="connection-group">
-            <h3>YOUTUBE</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h3>YOUTUBE</h3>
+                {youtubeUser ? (
+                    <span style={{ fontSize: '0.7em', color: '#ff4444', cursor: 'pointer' }} onClick={() => setIsLoginModalOpen(true)} title="Click to update login">Logged as {youtubeUser}</span>
+                ) : (
+                    <button className="filter-btn" style={{ width: 'auto', padding: '0 6px', fontSize: '0.7em' }} onClick={() => setIsLoginModalOpen(true)}>
+                        <LogIn size={10} style={{ marginRight: 4 }} /> Login
+                    </button>
+                )}
+            </div>
             <div className="input-row">
                 <input
                   placeholder="ID, URL, or @Handle"
@@ -437,16 +507,54 @@ function App() {
             highlightTerms={[twitchChannel, youtubeVideoId].filter(Boolean)}
             thirdPartyEmotes={thirdPartyEmotes}
         />
-        {twitchConnected && twitchToken && (
-             <ChatInput onSendMessage={handleSendMessage} />
+        
+        {/* Chat Input Area */}
+        {(canSendTwitch || canSendYoutube) && (
+            <div className="chat-input-container" style={{ padding: '0 10px 10px 10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                {canSendTwitch && canSendYoutube && (
+                    <div className="provider-switch" style={{ display: 'flex', gap: '10px', fontSize: '0.8em', paddingLeft: '4px' }}>
+                        <span style={{ opacity: 0.7 }}>Send as:</span>
+                        <label style={{ cursor: 'pointer', color: chatProvider === 'twitch' ? '#a970ff' : 'inherit', fontWeight: chatProvider === 'twitch' ? 'bold' : 'normal' }}>
+                            <input 
+                                type="radio" 
+                                name="chatProvider" 
+                                checked={chatProvider === 'twitch'} 
+                                onChange={() => setChatProvider('twitch')} 
+                                style={{ marginRight: '4px' }}
+                            />
+                            Twitch ({twitchUser})
+                        </label>
+                        <label style={{ cursor: 'pointer', color: chatProvider === 'youtube' ? '#ff4444' : 'inherit', fontWeight: chatProvider === 'youtube' ? 'bold' : 'normal' }}>
+                            <input 
+                                type="radio" 
+                                name="chatProvider" 
+                                checked={chatProvider === 'youtube'} 
+                                onChange={() => setChatProvider('youtube')} 
+                                style={{ marginRight: '4px' }}
+                            />
+                            YouTube ({youtubeUser})
+                        </label>
+                    </div>
+                )}
+                
+                <ChatInput 
+                    onSendMessage={handleSendMessage} 
+                    placeholder={`Message ${chatProvider === 'twitch' ? 'Twitch' : 'YouTube'}...`}
+                />
+            </div>
         )}
+
         <UpdateNotification />
       </div>
       
       <LoginModal 
         isOpen={isLoginModalOpen} 
         onClose={() => setIsLoginModalOpen(false)} 
-        onLogin={handleLogin}
+        onLogin={() => {}} 
+        twitchUser={twitchUser}
+        youtubeUser={youtubeUser}
+        onLogoutTwitch={() => { setTwitchUser(""); setTwitchToken(""); }}
+        onLogoutYoutube={() => { setYoutubeUser(""); setYoutubeToken(""); }}
       />
     </div>
     </>

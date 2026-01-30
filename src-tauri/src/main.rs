@@ -6,7 +6,7 @@ mod youtube;
 
 use tauri::AppHandle;
 use twitch::start_twitch_handler;
-use youtube::start_youtube_handler;
+use youtube::{start_youtube_handler, send_youtube_message};
 use tauri::{Manager, Listener, Emitter};
 use tauri_plugin_opener::OpenerExt;
 use image::GenericImageView;
@@ -95,8 +95,8 @@ fn main() {
                     
                     eprintln!("Extracted Access Token (len: {})", token.len());
                     
-                    // Directly emit the token to frontend (No exchange needed for Implicit Flow)
-                    let _ = app_handle.emit("twitch-token-received", token);
+                    // Emit generic token event. Frontend determines provider via local state.
+                    let _ = app_handle.emit("auth-token-received", token);
                 }
             });
 
@@ -107,7 +107,9 @@ fn main() {
             send_twitch_message,
             join_youtube,
             open_link,
-            start_twitch_oauth
+            start_twitch_oauth,
+            start_youtube_oauth,
+            send_youtube_message
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -115,9 +117,6 @@ fn main() {
 
 #[tauri::command]
 async fn start_twitch_oauth(app: AppHandle) -> Result<(), String> {
-    // Implicit Grant Flow
-    // URL: https://id.twitch.tv/oauth2/authorize?response_type=token&client_id=...&redirect_uri=...&scope=...
-    
     let client_id = "j07v9449bxjpfqx1msfnceaol2uwhx"; 
     let redirect_uri_encoded = "https%3A%2F%2Fheychatapp.com%2Fauth"; 
     
@@ -126,7 +125,23 @@ async fn start_twitch_oauth(app: AppHandle) -> Result<(), String> {
         client_id, redirect_uri_encoded
     );
 
-    // Open Browser
+    app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn start_youtube_oauth(app: AppHandle) -> Result<(), String> {
+    let client_id = "672007843378-gdj25iqn8h3eu6mp8qmqbfuvonuc2fkl.apps.googleusercontent.com";
+    let redirect_uri_encoded = "https%3A%2F%2Fheychatapp.com%2Fauth";
+    // Scopes: youtube.force-ssl + email + profile + openid
+    // Separated by space (encoded as + or %20)
+    let scope_encoded = "https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fyoutube.force-ssl+email+profile+openid";
+    
+    let url = format!(
+        "https://accounts.google.com/o/oauth2/v2/auth?response_type=token&client_id={}&redirect_uri={}&scope={}",
+        client_id, redirect_uri_encoded, scope_encoded
+    );
+
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())?;
     Ok(())
 }
