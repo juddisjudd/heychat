@@ -4,50 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HeyChat Authentication</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
     <style>
         body {
-            background-color: #0d0d0d;
-            color: #eee;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            margin: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at 50% 50%, rgba(145, 70, 255, 0.05) 0%, transparent 50%);
         }
 
-        .container {
+        .auth-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 48px;
+            border-radius: 24px;
             text-align: center;
-            background: #1a1a1a;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            border: 1px solid #333;
+            backdrop-filter: blur(10px);
             max-width: 400px;
             width: 90%;
-        }
-
-        h1 {
-            margin: 0 0 20px 0;
-            font-size: 24px;
-            background: linear-gradient(45deg, #9146FF, #ff0000);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        p {
-            color: #aaa;
-            margin-bottom: 0;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
         }
 
         .spinner {
             width: 40px;
             height: 40px;
-            border: 3px solid #333;
-            border-top: 3px solid #9146FF;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid var(--accent-primary);
             border-radius: 50%;
-            margin: 0 auto 20px auto;
+            margin: 0 auto 24px auto;
             animation: spin 1s linear infinite;
         }
 
@@ -56,40 +47,49 @@
             100% { transform: rotate(360deg); }
         }
 
-        .footer {
-            margin-top: 40px;
-            font-size: 0.8em;
-            color: #666;
+        .auth-title {
+            font-size: 2rem;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #fff 30%, #a0a0a0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
-        a {
-            color: #666;
-            text-decoration: none;
-            transition: color 0.2s;
-        }
-
-        a:hover {
-            color: #9146FF;
+        .status-text {
+            color: var(--text-muted);
+            font-size: 1.1rem;
         }
 
         .error-message {
-            color: #ff4444;
+            color: var(--accent-secondary);
             display: none;
-            margin-top: 10px;
+            margin-top: 16px;
+            background: rgba(255, 0, 0, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .footer {
+            margin-top: 32px;
+            font-size: 0.9rem;
+            opacity: 0.6;
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="auth-card">
         <div class="spinner" id="spinner"></div>
-        <h1>HeyChat</h1>
-        <p id="status-text">Authenticating...</p>
+        <h1 class="auth-title">HeyChat</h1>
+        <p id="status-text" class="status-text">Authenticating...</p>
         <p id="error-text" class="error-message"></p>
     </div>
 
     <div class="footer">
-        <a href="privacy.html">Privacy Policy</a> &bull; 
-        <a href="terms.html">Terms of Service</a>
+        <div class="footer-links">
+            <a href="privacy.html">Privacy Policy</a>
+            <a href="terms.html">Terms of Service</a>
+        </div>
     </div>
 
     <script>
