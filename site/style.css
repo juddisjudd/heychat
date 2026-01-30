@@ -149,25 +149,83 @@ h1.hero-title {
 }
 
 /* Buttons */
+.hero-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+}
+
 .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     background: #fff;
     color: #000;
-    padding: 16px 32px;
+    padding: 16px 40px;
     border-radius: 100px;
     font-weight: 600;
     font-size: 1.1rem;
     transition: all 0.2s ease;
-    border: 1px solid transparent;
+    border: 1px solid transparent; /* default border */
+}
+
+.btn-download {
+    flex-direction: column;
+    height: auto;
+    gap: 8px;
+    padding: 14px 50px;
+}
+
+.btn-text {
+    font-size: 1.3rem;
+    line-height: 1;
+}
+
+.btn-platforms {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+}
+
+.icon-platform {
+    height: 18px;
+    width: auto;
+    fill: currentColor;
+    display: block;
 }
 
 .btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 30px rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 30px rgba(255, 255, 255, 0.25);
     background: #f0f0f0;
     color: #000;
+}
+
+.btn:hover .btn-platforms {
+    opacity: 0.9;
+}
+
+.btn-link {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    padding: 8px 16px;
+    text-decoration: none;
+    margin-top: -8px; /* Pull it up slightly */
+}
+
+.btn-link:hover {
+    color: #fff;
+    text-decoration: underline;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
 }
 
 /* Features Grid */
@@ -176,8 +234,8 @@ h1.hero-title {
     max-width: 1200px;
     margin: 0 auto 100px auto;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); /* Slightly wider cards */
+    gap: 32px;
 }
 
 .feature-card {
