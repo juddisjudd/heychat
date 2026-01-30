@@ -3,143 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HeyChat Authentication</title>
+    <title>HeyChat - All your chats in one place</title>
     <style>
         body {
             background-color: #0d0d0d;
             color: #eee;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        .hero {
+            height: 80vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            margin: 0;
-        }
-
-        .container {
             text-align: center;
-            background: #1a1a1a;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            border: 1px solid #333;
-            max-width: 400px;
-            width: 90%;
+            background: radial-gradient(circle at center, #1a1a1a 0%, #0d0d0d 100%);
+            padding: 20px;
         }
 
         h1 {
+            font-size: 4rem;
             margin: 0 0 20px 0;
-            font-size: 24px;
             background: linear-gradient(45deg, #9146FF, #ff0000);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            font-weight: 800;
         }
 
-        p {
+        p.subtitle {
+            font-size: 1.5rem;
             color: #aaa;
-            margin-bottom: 0;
+            max-width: 600px;
+            margin-bottom: 40px;
         }
 
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid #333;
-            border-top: 3px solid #9146FF;
-            border-radius: 50%;
-            margin: 0 auto 20px auto;
-            animation: spin 1s linear infinite;
+        .cta-button {
+            display: inline-block;
+            background-color: #eee;
+            color: #111;
+            padding: 15px 30px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.2rem;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 255, 255, 0.2);
+        }
+
+        .features {
+            padding: 80px 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+        }
+
+        .feature-card {
+            background: #1a1a1a;
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid #333;
+        }
+
+        .feature-card h3 {
+            color: #fff;
+            margin-top: 0;
         }
 
         .footer {
-            margin-top: 40px;
-            font-size: 0.8em;
+            text-align: center;
+            padding: 40px;
+            border-top: 1px solid #222;
             color: #666;
+            font-size: 0.9em;
         }
 
-        a {
-            color: #666;
+        .footer a {
+            color: #888;
             text-decoration: none;
-            transition: color 0.2s;
+            margin: 0 10px;
         }
 
-        a:hover {
-            color: #9146FF;
-        }
-
-        .error-message {
-            color: #ff4444;
-            display: none;
-            margin-top: 10px;
+        .footer a:hover {
+            color: #eee;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="spinner" id="spinner"></div>
+    <div class="hero">
         <h1>HeyChat</h1>
-        <p id="status-text">Authenticating...</p>
-        <p id="error-text" class="error-message"></p>
+        <p class="subtitle">Streamline your streaming. Unite Twitch and YouTube chats in one powerful, native desktop application.</p>
+        <a href="https://github.com/juddisjudd/heychat/releases" class="cta-button">Download for Windows</a>
     </div>
 
-    <div class="footer">
-        <a href="privacy.html">Privacy Policy</a> &bull; 
-        <a href="terms.html">Terms of Service</a>
+    <div class="features">
+        <div class="feature-card">
+            <h3>Unified Chat</h3>
+            <p>View messages from Twitch and YouTube side-by-side in a single, clean interface.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Native Performance</h3>
+            <p>Built with Rust and Tauri for blazing fast performance and low memory usage.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Role Highlighting</h3>
+            <p>Never miss a message from VIPs, Mods, or Members with distinct visual indicators.</p>
+        </div>
     </div>
 
-    <script>
-        const statusText = document.getElementById('status-text');
-        const errorText = document.getElementById('error-text');
-        const spinner = document.getElementById('spinner');
-
-        function showError(msg) {
-            statusText.style.display = 'none';
-            spinner.style.display = 'none';
-            errorText.innerText = msg;
-            errorText.style.display = 'block';
-        }
-
-        // 1. Implicit Grant Flow (Hash Fragment)
-        if (window.location.hash) {
-            const hash = window.location.hash.substring(1);
-            const params = new URLSearchParams(hash);
-            const accessToken = params.get('access_token');
-            const error = params.get('error');
-
-            if (error) {
-                showError("Authentication failed: " + error);
-            } else if (accessToken) {
-                statusText.innerText = "Redirecting to app...";
-                // Small delay to let animations play/user see the message
-                setTimeout(() => {
-                    window.location.href = `heychat://auth?access_token=${accessToken}`;
-                }, 500);
-            }
-        } 
-        // 2. Fallback / PKCE (Query Params)
-        else if (window.location.search) {
-             const params = new URLSearchParams(window.location.search);
-             const code = params.get('code');
-             const error = params.get('error');
-             
-             if (error) {
-                 showError("Authentication failed: " + error);
-             } else if (code) {
-                 statusText.innerText = "Redirecting to app...";
-                 setTimeout(() => {
-                     window.location.href = `heychat://auth?code=${code}`;
-                 }, 500);
-             }
-        } else {
-             // Just visiting the page directly?
-             statusText.innerText = "Please close this window and try logging in from the app.";
-             spinner.style.display = 'none';
-        }
-    </script>
+    <footer class="footer">
+        <p>&copy; 2026 HeyChat. Open Source.</p>
+        <p>
+            <a href="privacy.html">Privacy Policy</a> | 
+            <a href="terms.html">Terms of Service</a> |
+            <a href="https://github.com/juddisjudd/heychat">GitHub</a>
+        </p>
+    </footer>
 </body>
 </html>
