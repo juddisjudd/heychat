@@ -809,6 +809,13 @@ textarea.favorites-input {
     align-items: center;
 }
 
+.chat-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+}
+
 .chat-input-field {
     flex: 1;
     background-color: #1a1a1a;

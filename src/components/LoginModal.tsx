@@ -47,8 +47,8 @@ export function LoginModal({ isOpen, onClose, twitchUser, youtubeUser, onLogoutT
         <div className="modal-body">
             
             {/* Twitch Section */}
-            <div className="info-box" style={{ marginBottom: '15px' }}>
-                <h3 style={{ margin: '0 0 10px 0', fontSize: '1em', color: '#a970ff' }}>Twitch</h3>
+            {/* Twitch Section */}
+            <div style={{ marginBottom: '15px' }}>
                 {twitchUser ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <div style={{ fontSize: '0.9em', opacity: 0.8 }}>Logged in as <b>{twitchUser}</b></div>
@@ -71,8 +71,7 @@ export function LoginModal({ isOpen, onClose, twitchUser, youtubeUser, onLogoutT
             </div>
 
             {/* YouTube Section */}
-            <div className="info-box">
-                <h3 style={{ margin: '0 0 10px 0', fontSize: '1em', color: '#ff4444' }}>YouTube</h3>
+            <div>
                 {youtubeUser ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <div style={{ fontSize: '0.9em', opacity: 0.8 }}>Logged in as <b>{youtubeUser}</b></div>

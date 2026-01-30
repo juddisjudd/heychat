@@ -11,6 +11,7 @@ import { LoginModal } from "./components/LoginModal";
 import { ChatInput } from "./components/ChatInput";
 import "./App.css";
 
+import { ToastContainer, ToastMessage } from "./components/Toast";
 import { fetchThirdPartyEmotes, EmoteMap } from "./utils/emotes";
 
 const COMMON_BOTS = ['streamlabs', 'streamelements', 'moobot', 'nightbot', 'fossabot', 'soundalerts'];
@@ -30,6 +31,9 @@ function App() {
   const [hideBots, setHideBots] = useState(false);
   const [thirdPartyEmotes, setThirdPartyEmotes] = useState<EmoteMap>(new Map());
 
+  // Toast State
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
   // YouTube Auth
   const [youtubeToken, setYoutubeToken] = useState("");
   const [youtubeUser, setYoutubeUser] = useState("");
@@ -41,9 +45,17 @@ function App() {
   const [twitchUser, setTwitchUser] = useState("");
   const [twitchToken, setTwitchToken] = useState("");
 
+  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info', duration = 3000) => {
+    const id = Date.now().toString() + Math.random().toString();
+    setToasts(prev => [...prev, { id, message, type, duration }]);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
   // Load settings from localStorage on mount
   useEffect(() => {
-    // ... localStorage loading ...
     getVersion().then(setAppVersion);
     
     const savedTwitch = localStorage.getItem("heychat_twitch_channel");
@@ -78,47 +90,43 @@ function App() {
   }, [twitchChannel, youtubeVideoId, isSidebarOpen, favoritesInput, twitchUser, twitchToken, youtubeUser, youtubeToken]);
 
   useEffect(() => {
-    let unlistenChat: (() => void) | undefined;
-    let unlistenTwitch: (() => void) | undefined;
-    let unlistenTwitchError: (() => void) | undefined;
-    let unlistenAuth: (() => void) | undefined;
-    let unlistenYoutube: (() => void) | undefined;
+    const unlisteners: Promise<() => void>[] = [];
 
     const setupListeners = async () => {
       // 1. Chat Messages
-      unlistenChat = await listen<ChatMessage>("chat-message", (event) => {
+      unlisteners.push(listen<ChatMessage>("chat-message", (event) => {
           console.log("Frontend received event:", event);
           setMessages((prev) => {
               if (prev.some(m => m.id === event.payload.id)) return prev;
               return [...prev.slice(-200), event.payload];
           }); 
-      });
+      }));
 
       // 2. Twitch Connection Info (Emote Loading)
-      unlistenTwitch = await listen<string>("twitch-connected", async (event) => {
+      unlisteners.push(listen<string>("twitch-connected", async (event) => {
           console.log("Twitch connected, fetching emotes for channel ID:", event.payload);
           const channelId = event.payload;
           const emotes = await fetchThirdPartyEmotes(channelId);
           setThirdPartyEmotes(emotes);
           setTwitchConnected(true); 
-      });
+      }));
 
       // 3. YouTube Connection Info (Resolved ID)
-      unlistenYoutube = await listen<string>("youtube-connected", (event) => {
+      unlisteners.push(listen<string>("youtube-connected", (event) => {
          console.log("YouTube connected, resolved ID:", event.payload);
          setYoutubeVideoId(event.payload);
          setYoutubeConnected(true);
-      });
+      }));
 
       // 4. Twitch Error (Auth Failure)
-      unlistenTwitchError = await listen<string>("twitch-error", (event) => {
+      unlisteners.push(listen<string>("twitch-error", (event) => {
           console.error("Twitch Error:", event.payload);
           setTwitchConnected(false);
-          alert(`Twitch Error: ${event.payload}`);
-      });
+          addToast(`Twitch Error: ${event.payload}`, 'error');
+      }));
 
       // 5. Auth Token Received (Generic)
-      unlistenAuth = await listen<string>("auth-token-received", async (event) => {
+      unlisteners.push(listen<string>("auth-token-received", async (event) => {
           const token = event.payload;
           const provider = localStorage.getItem("pending_auth_provider");
           console.log(`Auth token received for provider: ${provider}`);
@@ -137,10 +145,10 @@ function App() {
                  if (user) {
                      setTwitchUser(user);
                      setTwitchToken(token);
-                     alert(`Logged in as ${user} (Twitch)`);
+                     addToast(`Logged in as ${user} (Twitch)`, 'success');
                  }
               } catch (e) {
-                  alert("Twitch login failed: " + String(e));
+                  addToast("Twitch login failed: " + String(e), 'error');
               }
           } else if (provider === 'youtube') {
               try {
@@ -153,26 +161,22 @@ function App() {
                   if (user) {
                       setYoutubeUser(user);
                       setYoutubeToken(token);
-                      alert(`Logged in as ${user} (YouTube)`);
+                      addToast(`Logged in as ${user} (YouTube)`, 'success');
                   }
               } catch (e) {
-                   alert("YouTube login failed: " + String(e));
+                   addToast("YouTube login failed: " + String(e), 'error');
               }
           }
           
           setIsLoginModalOpen(false);
           localStorage.removeItem("pending_auth_provider");
-      });
+      }));
     };
     
     setupListeners();
 
     return () => {
-      if (unlistenChat) unlistenChat();
-      if (unlistenTwitch) unlistenTwitch();
-      if (unlistenYoutube) unlistenYoutube();
-      if (unlistenTwitchError) unlistenTwitchError();
-      if (unlistenAuth) unlistenAuth();
+        unlisteners.forEach(p => p.then(f => f()));
     };
   }, []);
 
@@ -198,7 +202,6 @@ function App() {
 
   async function handleSendMessage(message: string) {
       if (chatProvider === 'twitch' && twitchConnected && twitchToken) {
-           // ... (Twitch Logic) ...
            const existingMsg = messages.find(m => m.username.toLowerCase() === twitchUser.toLowerCase());
            const userColor = existingMsg?.color || '#9146FF';
            const tempMessage: ChatMessage = {
@@ -222,11 +225,14 @@ function App() {
                await invoke("send_twitch_message", { channel: twitchChannel, message });
            } catch (e) {
                console.error("Failed to send Twitch message:", e);
-               alert("Failed to send Twitch message: " + String(e));
+               addToast("Failed to send Twitch message: " + String(e), 'error');
            }
 
       } else if (chatProvider === 'youtube' && youtubeConnected && youtubeToken) {
-           // YouTube Logic
+           // TEMPORARY: Block sending due to API 404 issues
+           addToast('YouTube sending is temporarily disabled due to API 404 errors.', 'info');
+           return;
+           /* 
            const tempMessage: ChatMessage = {
                id: `local-yt-${Date.now()}`,
                platform: 'YouTube',
@@ -246,14 +252,15 @@ function App() {
 
            try {
                await invoke("send_youtube_message", { 
-                   videoId: youtubeVideoId, // Must be the resolved one! handled by connection updates
+                   videoId: youtubeVideoId,
                    message, 
                    token: youtubeToken 
                });
            } catch (e) {
                console.error("Failed to send YouTube message:", e);
-               alert("Failed to send YouTube message: " + String(e)); 
+               addToast("Failed to send YouTube message: " + String(e), 'error'); 
            }
+           */
       }
   }
 
@@ -271,18 +278,14 @@ function App() {
        }
   };
   
-  // ... (rest) ...
-  
-  // Update UI to toggle providers
-  // Inside return (before ChatInput)
-  
   const canSendTwitch = twitchConnected && !!twitchToken;
   const canSendYoutube = youtubeConnected && !!youtubeToken;
+  // const canSendYoutube = false; // TEMPORARY: Disabled due to persistent API 404 errors. Reading works, sending is blocked.
   
-  // Auto-switch provider if one becomes available/unavailable
+  // Auto-switch provider: Prefer Twitch if available.
   useEffect(() => {
-      if (canSendTwitch && !canSendYoutube) setChatProvider('twitch');
-      else if (!canSendTwitch && canSendYoutube) setChatProvider('youtube');
+      if (canSendTwitch) setChatProvider('twitch');
+      else if (canSendYoutube) setChatProvider('youtube');
   }, [canSendTwitch, canSendYoutube]);
 
   // Filter Logic
@@ -510,37 +513,69 @@ function App() {
         
         {/* Chat Input Area */}
         {(canSendTwitch || canSendYoutube) && (
-            <div className="chat-input-container" style={{ padding: '0 10px 10px 10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            <div className="chat-input-container">
                 {canSendTwitch && canSendYoutube && (
-                    <div className="provider-switch" style={{ display: 'flex', gap: '10px', fontSize: '0.8em', paddingLeft: '4px' }}>
-                        <span style={{ opacity: 0.7 }}>Send as:</span>
-                        <label style={{ cursor: 'pointer', color: chatProvider === 'twitch' ? '#a970ff' : 'inherit', fontWeight: chatProvider === 'twitch' ? 'bold' : 'normal' }}>
-                            <input 
-                                type="radio" 
-                                name="chatProvider" 
-                                checked={chatProvider === 'twitch'} 
-                                onChange={() => setChatProvider('twitch')} 
-                                style={{ marginRight: '4px' }}
-                            />
-                            Twitch ({twitchUser})
-                        </label>
-                        <label style={{ cursor: 'pointer', color: chatProvider === 'youtube' ? '#ff4444' : 'inherit', fontWeight: chatProvider === 'youtube' ? 'bold' : 'normal' }}>
-                            <input 
-                                type="radio" 
-                                name="chatProvider" 
-                                checked={chatProvider === 'youtube'} 
-                                onChange={() => setChatProvider('youtube')} 
-                                style={{ marginRight: '4px' }}
-                            />
-                            YouTube ({youtubeUser})
-                        </label>
+                    <div className="provider-selector" style={{ display: 'flex', background: '#1a1a1a', borderRadius: '6px', padding: '4px', gap: '4px', border: '1px solid #333' }}>
+                         <button 
+                            className={`platform-toggle-btn ${chatProvider === 'twitch' ? 'active twitch' : ''}`}
+                            onClick={() => setChatProvider('twitch')}
+                            title="Send via Twitch"
+                            style={{ 
+                                background: chatProvider === 'twitch' ? '#9146FF' : 'transparent', 
+                                border: 'none', 
+                                borderRadius: '4px',
+                                padding: '6px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                color: chatProvider === 'twitch' ? '#fff' : '#666',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
+                            </svg>
+                        </button>
+                        <button 
+                            className={`platform-toggle-btn ${chatProvider === 'youtube' ? 'active youtube' : ''}`}
+                            onClick={() => addToast("YouTube sending is temporarily disabled while we work on improvements.", 'info')}
+                            title="Send via YouTube (Disabled)"
+                            style={{ 
+                                background: chatProvider === 'youtube' ? '#ff0000' : 'transparent', 
+                                border: 'none', 
+                                borderRadius: '4px',
+                                padding: '6px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                color: chatProvider === 'youtube' ? '#fff' : '#666',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                            </svg>
+                        </button>
                     </div>
                 )}
                 
-                <ChatInput 
-                    onSendMessage={handleSendMessage} 
-                    placeholder={`Message ${chatProvider === 'twitch' ? 'Twitch' : 'YouTube'}...`}
-                />
+                {/* Single Provider Indicator if only one is available */}
+                {(!canSendTwitch || !canSendYoutube) && (
+                    <div style={{ padding: '8px', color: '#666', opacity: 0.5 }}>
+                        {canSendTwitch ? (
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
+                        ) : (
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                        )}
+                    </div>
+                )}
+
+                <div style={{ flex: 1 }}>
+                    <ChatInput 
+                        onSendMessage={handleSendMessage} 
+                        placeholder={`Message ${chatProvider === 'twitch' ? 'Twitch' : 'YouTube'}...`}
+                    />
+                </div>
             </div>
         )}
 
@@ -556,6 +591,7 @@ function App() {
         onLogoutTwitch={() => { setTwitchUser(""); setTwitchToken(""); }}
         onLogoutYoutube={() => { setYoutubeUser(""); setYoutubeToken(""); }}
       />
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
     </>
   );

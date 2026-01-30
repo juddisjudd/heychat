@@ -25,7 +25,7 @@ export function ChatInput({ onSendMessage, disabled, placeholder = "Send a messa
     };
 
     return (
-        <div className="chat-input-container">
+        <div className="chat-input-row">
             <input 
                 value={message}
                 onChange={e => setMessage(e.target.value)}

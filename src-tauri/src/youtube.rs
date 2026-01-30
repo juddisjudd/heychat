@@ -336,37 +336,144 @@ struct VideoItem {
 }
 
 #[derive(serde::Deserialize, Debug)]
+#[allow(dead_code)]
 struct LiveStreamingDetails {
     #[serde(rename = "activeLiveChatId")]
     active_live_chat_id: Option<String>,
+    #[serde(rename = "actualStartTime")]
+    actual_start_time: Option<String>,
+    #[serde(rename = "actualEndTime")]
+    actual_end_time: Option<String>,
+    #[serde(rename = "scheduledStartTime")]
+    scheduled_start_time: Option<String>,
+    #[serde(rename = "isChatModerator")]
+    is_chat_moderator: Option<bool>,
 }
 
 #[tauri::command]
 pub async fn send_youtube_message(video_id: String, message: String, token: String) -> Result<(), String> {
-    let client = Client::new();
+    eprintln!("DEBUG: send_youtube_message called.");
+    eprintln!("DEBUG: Input Video ID: {}", video_id);
+    eprintln!("DEBUG: Token starts with: {:.10}...", token);
+
+    let client = Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .build()
+        .unwrap_or_default();
+
+    // 0. Verify Token Scopes
+    let scope_url = format!("https://www.googleapis.com/oauth2/v3/tokeninfo?access_token={}", token);
+    eprintln!("DEBUG: Checking Token Scopes: {}", scope_url);
+    let scope_resp = client.get(&scope_url).send().await.map_err(|e| format!("Scope check failed: {}", e))?;
+    
+    if scope_resp.status().is_success() {
+        let scope_json: Value = scope_resp.json().await.unwrap_or(serde_json::json!({}));
+        if let Some(scope) = scope_json.get("scope").and_then(|s| s.as_str()) {
+            eprintln!("DEBUG: Token Scopes: {}", scope);
+            if !scope.contains("youtube.force-ssl") && !scope.contains("youtube") { // "youtube" is the full scope, force-ssl is the other one
+                return Err("Missing 'youtube.force-ssl' scope. Please log out and log in again.".to_string());
+            }
+        } else {
+             eprintln!("DEBUG: Could not parse scopes from response: {:?}", scope_json);
+        }
+    } else {
+         eprintln!("DEBUG: Token check failed. Status: {}", scope_resp.status());
+    }
+
+    // 0. Verify YouTube Data API Access AND Channel Existence
+    let probe_url = "https://www.googleapis.com/youtube/v3/channels?part=id&mine=true";
+    eprintln!("DEBUG: Probing YouTube Data API: {}", probe_url);
+    let probe_resp = client.get(probe_url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Probe failed: {}", e))?;
+        
+    if !probe_resp.status().is_success() {
+        let status = probe_resp.status();
+        let body = probe_resp.text().await.unwrap_or_default();
+        eprintln!("DEBUG: YouTube Data API Probe Failed. Status: {}, Body: {}", status, body);
+        if status.as_u16() == 403 || status.as_u16() == 404 {
+            return Err("YouTube Data API v3 is likely NOT enabled in Google Cloud Console. Enable it here: https://console.cloud.google.com/apis/library/youtube.googleapis.com".to_string());
+        }
+        return Err(format!("YouTube Data API Probe failed: [{}] {}", status, body));
+    }
+
+    // Check if user actually has a channel
+    let probe_json: Value = probe_resp.json().await.unwrap_or(serde_json::json!({}));
+    if let Some(items) = probe_json.get("items").and_then(|i| i.as_array()) {
+        if items.is_empty() {
+            eprintln!("DEBUG: Probe returned 0 channels. User likely has no YouTube Channel created.");
+            return Err("Your Google Account does not have a YouTube Channel. You must create a channel to use Live Chat.".to_string());
+        } else {
+             eprintln!("DEBUG: Probe found {} channel(s). ID: {:?}", items.len(), items[0].pointer("/id"));
+        }
+    } else {
+        eprintln!("DEBUG: Probe response format unexpected: {:?}", probe_json);
+    }
 
     // 1. Get Live Chat ID
     let list_url = format!("https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={}", video_id);
+    eprintln!("DEBUG: Fetching video details from: {}", list_url);
     
     let resp = client.get(&list_url)
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("Network error fetching video: {}", e))?;
 
     if !resp.status().is_success() {
+         let status = resp.status();
          let txt = resp.text().await.unwrap_or_default();
+         eprintln!("DEBUG: Failed to get video details. Status: {}", status);
          return Err(format!("Failed to get video details: {}", txt));
     }
 
-    let list_data: VideoListResponse = resp.json().await.map_err(|e| e.to_string())?;
+    let list_data: VideoListResponse = resp.json().await.map_err(|e| format!("JSON parse error (video): {}", e))?;
     
-    let chat_id = list_data.items.first()
-        .and_then(|i| i.live_streaming_details.as_ref())
+    if list_data.items.is_empty() {
+        eprintln!("DEBUG: Video details response has 0 items.");
+        return Err("No video found with that ID".to_string());
+    }
+
+    let item = list_data.items.first().unwrap();
+    let details = item.live_streaming_details.as_ref();
+    
+    eprintln!("DEBUG: Live Streaming Details: {:?}", details);
+
+    if let Some(d) = details {
+        if let Some(end_time) = &d.actual_end_time {
+            eprintln!("DEBUG: Stream has ended at {}", end_time);
+            return Err("Cannot send message: The live stream has ended.".to_string());
+        }
+    }
+
+    let chat_id = details
         .and_then(|d| d.active_live_chat_id.as_ref())
         .ok_or("No active live chat found. Is the stream live?")?;
 
-    eprintln!("Found Live Chat ID: {}", chat_id);
+    eprintln!("DEBUG: Found Live Chat ID: {}", chat_id);
+
+    // 1.5 Verify Chat ID access (GET list)
+    let encoded_chat_id = urlencoding::encode(chat_id);
+    let check_url = format!("https://www.googleapis.com/youtube/v3/liveChatMessages?liveChatId={}&part=snippet", encoded_chat_id);
+    eprintln!("DEBUG: GET Check URL: {}", check_url);
+
+    let check_resp = client.get(&check_url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    if !check_resp.status().is_success() {
+        let s = check_resp.status();
+        let t = check_resp.text().await.unwrap_or_default();
+        eprintln!("DEBUG: GET check failed. Status: {}, Body: {}", s, t);
+        // We warn but proceed? Or fail? If GET fails, POST will likely fail.
+        // It's useful to know.
+    } else {
+        eprintln!("DEBUG: GET check passed (Live Chat is readable).");
+    }
 
     // 2. Post Message
     let url = "https://www.googleapis.com/youtube/v3/liveChatMessages?part=snippet";
@@ -381,6 +488,7 @@ pub async fn send_youtube_message(video_id: String, message: String, token: Stri
         }
     });
 
+    eprintln!("DEBUG: Posting message to {}", url);
     let post_resp = client.post(url)
         .header("Authorization", format!("Bearer {}", token))
         .json(&body)
@@ -389,9 +497,12 @@ pub async fn send_youtube_message(video_id: String, message: String, token: Stri
         .map_err(|e| e.to_string())?;
 
     if !post_resp.status().is_success() {
+        let status = post_resp.status();
         let txt = post_resp.text().await.unwrap_or_default();
-        return Err(format!("Failed to send message: {}", txt));
+        eprintln!("Failed to send YouTube message. Status: {}, Body: {}", status, txt);
+        return Err(format!("Failed to send message: [{}] {}", status, txt));
     }
 
+    eprintln!("DEBUG: Message sent successfully!");
     Ok(())
 }
