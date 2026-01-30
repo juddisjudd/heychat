@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { X, ExternalLink, KeyRound, User, LogOut } from 'lucide-react';
+import { X, ExternalLink, LogOut } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 
 interface LoginModalProps {
