@@ -104,6 +104,22 @@
             errorText.style.display = 'block';
         }
 
+        function handleSuccess(url) {
+            statusText.innerText = "Redirecting to app...";
+            
+            // Redirect
+            setTimeout(() => {
+                window.location.href = url;
+                
+                // Then try to close or show success
+                setTimeout(() => {
+                    statusText.innerText = "Success! You can close this window now.";
+                    spinner.style.display = 'none';
+                    window.close();
+                }, 1500);
+            }, 500);
+        }
+
         // 1. Implicit Grant Flow (Hash Fragment)
         if (window.location.hash) {
             const hash = window.location.hash.substring(1);
@@ -114,11 +130,7 @@
             if (error) {
                 showError("Authentication failed: " + error);
             } else if (accessToken) {
-                statusText.innerText = "Redirecting to app...";
-                // Small delay to let animations play/user see the message
-                setTimeout(() => {
-                    window.location.href = `heychat://auth?access_token=${accessToken}`;
-                }, 500);
+                handleSuccess(`heychat://auth?access_token=${accessToken}`);
             }
         } 
         // 2. Fallback / PKCE (Query Params)
@@ -130,10 +142,7 @@
              if (error) {
                  showError("Authentication failed: " + error);
              } else if (code) {
-                 statusText.innerText = "Redirecting to app...";
-                 setTimeout(() => {
-                     window.location.href = `heychat://auth?code=${code}`;
-                 }, 500);
+                 handleSuccess(`heychat://auth?code=${code}`);
              }
         } else {
              // Just visiting the page directly?
