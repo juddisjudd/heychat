@@ -4,8 +4,7 @@ A minimal, chat app for streamers that aggregates messages from Twitch and YouTu
 
 [![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/juddisjudd/heychat/latest/total)](https://github.com/juddisjudd/heychat/releases) [![GitHub Release](https://img.shields.io/github/v/release/juddisjudd/heychat)](https://github.com/juddisjudd/heychat/releases) [![Release](https://github.com/juddisjudd/heychat/actions/workflows/release.yml/badge.svg)](https://github.com/juddisjudd/heychat/actions/workflows/release.yml)
 
-![heychat_2PJVyRfvjQ](https://github.com/user-attachments/assets/e841e58f-1b50-4c13-9326-ddc7491244a1)
-
+https://github.com/user-attachments/assets/c4800f78-3da9-4020-867a-ead006a56c45
 
 ## Features
 
