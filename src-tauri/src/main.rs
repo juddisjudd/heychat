@@ -4,9 +4,11 @@ mod models;
 mod twitch;
 mod youtube;
 
+
 use tauri::AppHandle;
 use twitch::start_twitch_handler;
 use youtube::{start_youtube_handler, send_youtube_message};
+
 use tauri::{Manager, Listener, Emitter};
 use tauri_plugin_opener::OpenerExt;
 use image::GenericImageView;
@@ -38,6 +40,8 @@ async fn send_twitch_message(state: tauri::State<'_, twitch::TwitchAppState>, ch
         Err("Twitch client not connected".to_string())
     }
 }
+
+
 
 #[tauri::command]
 fn join_youtube(app: AppHandle, video_id: String) {
@@ -106,6 +110,7 @@ fn main() {
             join_twitch,
             send_twitch_message,
             join_youtube,
+
             open_link,
             start_twitch_oauth,
             start_youtube_oauth,

@@ -20,8 +20,10 @@ function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [twitchChannel, setTwitchChannel] = useState("");
   const [youtubeVideoId, setYoutubeVideoId] = useState("");
+
   const [twitchConnected, setTwitchConnected] = useState(false);
   const [youtubeConnected, setYoutubeConnected] = useState(false);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [favoritesInput, setFavoritesInput] = useState("");
@@ -60,6 +62,7 @@ function App() {
     
     const savedTwitch = localStorage.getItem("heychat_twitch_channel");
     const savedYoutube = localStorage.getItem("heychat_youtube_id");
+
     const savedSidebar = localStorage.getItem("heychat_sidebar_open");
     const savedFavorites = localStorage.getItem("heychat_favorites");
     const savedTwitchUser = localStorage.getItem("heychat_twitch_username");
@@ -69,6 +72,7 @@ function App() {
 
     if (savedTwitch) setTwitchChannel(savedTwitch);
     if (savedYoutube) setYoutubeVideoId(savedYoutube);
+
     if (savedSidebar !== null) setIsSidebarOpen(savedSidebar === "true");
     if (savedFavorites) setFavoritesInput(savedFavorites);
     if (savedTwitchUser) setTwitchUser(savedTwitchUser);
@@ -81,6 +85,7 @@ function App() {
   useEffect(() => {
     localStorage.setItem("heychat_twitch_channel", twitchChannel);
     localStorage.setItem("heychat_youtube_id", youtubeVideoId);
+
     localStorage.setItem("heychat_sidebar_open", String(isSidebarOpen));
     localStorage.setItem("heychat_favorites", favoritesInput);
     localStorage.setItem("heychat_twitch_username", twitchUser);
@@ -117,6 +122,8 @@ function App() {
          setYoutubeVideoId(event.payload);
          setYoutubeConnected(true);
       }));
+
+
 
       // 4. Twitch Error (Auth Failure)
       unlisteners.push(listen<string>("twitch-error", (event) => {
@@ -199,6 +206,8 @@ function App() {
     await invoke("join_youtube", { videoId: youtubeVideoId });
     setYoutubeConnected(true);
   }
+
+
 
   async function handleSendMessage(message: string) {
       if (chatProvider === 'twitch' && twitchConnected && twitchToken) {
@@ -304,6 +313,7 @@ function App() {
     // 2. Platform filter
     if (activeFilter === 'TWITCH' && msg.platform !== 'Twitch') return false;
     if (activeFilter === 'YOUTUBE' && msg.platform !== 'YouTube') return false;
+
     
     // 3. Role filter
     if (activeFilter === 'VIP' && !msg.is_vip) return false;
@@ -390,6 +400,8 @@ function App() {
             </div>
           </div>
 
+
+
           <div className="connection-group">
              <h3>{favoriteUsers.length} FAVORITES</h3>
              <textarea
@@ -469,6 +481,7 @@ function App() {
                         <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                     </svg>
                 </button>
+
                 <button 
                     className={`filter-btn vip ${activeFilter === 'VIP' ? 'active' : ''}`}
                     onClick={() => toggleFilter('VIP')}
