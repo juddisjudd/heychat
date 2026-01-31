@@ -10,9 +10,11 @@ interface LoginModalProps {
   youtubeUser?: string;
   onLogoutTwitch: () => void;
   onLogoutYoutube: () => void;
+  kickUser?: string;
+  onLogoutKick: () => void;
 }
 
-export function LoginModal({ isOpen, onClose, twitchUser, youtubeUser, onLogoutTwitch, onLogoutYoutube }: LoginModalProps) { 
+export function LoginModal({ isOpen, onClose, twitchUser, youtubeUser, kickUser, onLogoutTwitch, onLogoutYoutube, onLogoutKick }: LoginModalProps) { 
   if (!isOpen) return null;
 
   const loginWithTwitch = async () => {
@@ -25,12 +27,24 @@ export function LoginModal({ isOpen, onClose, twitchUser, youtubeUser, onLogoutT
       }
   };
 
-  const loginWithYoutube = async () => {
+  const handleYoutubeLogin = async () => {
+      onClose(); // Assuming 'close()' from the instruction refers to 'onClose()'
       localStorage.setItem("pending_auth_provider", "youtube");
       try {
           await invoke('start_youtube_oauth');
       } catch (e) {
           console.error("Failed to start YouTube OAuth:", e);
+          alert("Failed to open browser: " + String(e));
+      }
+  };
+
+  const handleKickLogin = async () => {
+      onClose(); // Assuming 'close()' from the instruction refers to 'onClose()'
+      localStorage.setItem("pending_auth_provider", "kick");
+      try {
+          await invoke("start_kick_oauth");
+      } catch (e) {
+          console.error("Failed to start Kick OAuth:", e);
           alert("Failed to open browser: " + String(e));
       }
   };
@@ -85,10 +99,36 @@ export function LoginModal({ isOpen, onClose, twitchUser, youtubeUser, onLogoutT
                         </button>
                     </div>
                 ) : (
-                    <button type="button" onClick={loginWithYoutube} className="action-btn primary" style={{ width: '100%', justifyContent: 'center', background: '#ff0000' }}>
-                        <ExternalLink size={16} style={{ marginRight: '8px' }} />
-                        Log in with YouTube
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}> {/* Wrapped buttons in a div for consistent spacing */}
+                        <button type="button" disabled className="action-btn primary" style={{ width: '100%', justifyContent: 'center', background: '#333', color: '#999', cursor: 'not-allowed' }}>
+                            <ExternalLink size={16} style={{ marginRight: '8px' }} />
+                            Log in with YouTube (Coming Soon)
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* Kick Section */}
+            <div>
+                {kickUser ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ fontSize: '0.9em', opacity: 0.8 }}>Logged in as <b>{kickUser}</b></div>
+                        <button 
+                            type="button" 
+                            onClick={onLogoutKick} 
+                            className="action-btn" 
+                            style={{ width: '100%', justifyContent: 'center', background: 'rgba(255, 50, 50, 0.1)', color: '#ff5555', border: '1px solid rgba(255, 50, 50, 0.2)' }}
+                        >
+                            <LogOut size={14} style={{ marginRight: '8px' }} />
+                            Log Out
+                        </button>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}> {/* Wrapped buttons in a div for consistent spacing */}
+                        <button type="button" disabled className="action-btn primary" style={{ width: '100%', justifyContent: 'center', background: '#333', color: '#999', cursor: 'not-allowed' }}>
+                            Log in with Kick (Coming Soon)
+                        </button>
+                    </div>
                 )}
             </div>
             

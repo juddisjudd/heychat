@@ -7,7 +7,7 @@ export interface Emote {
 
 export interface ChatMessage {
     id: string;
-    platform: 'Twitch' | 'YouTube';
+    platform: 'Twitch' | 'YouTube' | 'Kick';
     username: string;
     message: string;
     color?: string;

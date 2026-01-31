@@ -176,3 +176,16 @@ pub async fn start_twitch_handler(
          eprintln!("Joined Twitch channel request sent.");
     }
 }
+
+pub async fn leave_twitch_channel(app: AppHandle, channel: String) {
+    if let Some(state) = app.try_state::<TwitchAppState>() {
+        // We need a read lock to get the client, but the client itself is thread-safe (clonable)
+        let client_opt = state.client.read().unwrap().clone();
+        
+        if let Some(client) = client_opt {
+             let channel_clean = channel.trim().trim_start_matches('#').to_lowercase();
+             eprintln!("Leaving Twitch channel: {}", channel_clean);
+             client.part(channel_clean);
+        }
+    }
+}

@@ -3,15 +3,22 @@
 mod models;
 mod twitch;
 mod youtube;
+mod kick;
 
 
 use tauri::AppHandle;
 use twitch::start_twitch_handler;
 use youtube::{start_youtube_handler, send_youtube_message};
+use kick::exchange_kick_code;
 
 use tauri::{Manager, Listener, Emitter};
 use tauri_plugin_opener::OpenerExt;
 use image::GenericImageView;
+
+#[tauri::command]
+fn greet(name: &str) -> String {
+    format!("Hello, {}! You've been greeted from Rust!", name)
+}
 
 #[tauri::command]
 fn join_twitch(
@@ -23,6 +30,11 @@ fn join_twitch(
     tauri::async_runtime::spawn(async move {
         start_twitch_handler(app, channel, username, token).await;
     });
+}
+
+#[tauri::command]
+async fn leave_twitch(app: AppHandle, channel: String) {
+    twitch::leave_twitch_channel(app, channel).await;
 }
 
 #[tauri::command]
@@ -55,6 +67,21 @@ fn open_link(url: String) {
     let _ = opener::open(url);
 }
 
+#[tauri::command]
+async fn join_kick(app: AppHandle, channel: String, chatroom_id: u64, broadcaster_user_id: u64) {
+    kick::start_kick_handler(app, channel, chatroom_id, broadcaster_user_id, None).await
+}
+
+#[tauri::command]
+async fn start_kick_oauth(app: AppHandle) -> Result<(), String> {
+    kick::start_kick_oauth(app).await
+}
+
+#[tauri::command]
+async fn send_kick_message(app: AppHandle, channel: String, message: String, token: String) -> Result<(), String> {
+    kick::send_kick_message(app, channel, message, token).await
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -74,6 +101,10 @@ fn main() {
             app.manage(twitch::TwitchAppState {
                 client: std::sync::RwLock::new(None),
             });
+            app.manage(kick::KickState {
+                broadcaster_ids: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+                pkce_verifier: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            });
 
             let icon_content = include_bytes!("../icons/icon.png");
             let icon_image = image::load_from_memory(icon_content).expect("failed to load icon");
@@ -91,27 +122,40 @@ fn main() {
                 let url_str = event.payload().trim().trim_matches('"');
                 eprintln!("Deep link received: {}", url_str);
                 
-                // Parse URL: heychat://auth?access_token=...
+                // Parse URL: heychat://auth?access_token=...  OR ?code=...
                 if let Some(token_idx) = url_str.find("access_token=") {
                     let token = &url_str[token_idx + 13..];
                     let token = token.split('&').next().unwrap_or(token);
                     let token = token.trim().trim_matches('"').trim_matches('\'').to_string();
-                    
                     eprintln!("Extracted Access Token (len: {})", token.len());
-                    
-                    // Emit generic token event. Frontend determines provider via local state.
                     let _ = app_handle.emit("auth-token-received", token);
+                } else if let Some(code_idx) = url_str.find("code=") {
+                    let code = &url_str[code_idx + 5..];
+                    let code = code.split('&').next().unwrap_or(code);
+                    let code = code.trim().trim_matches('"').trim_matches('\'').to_string();
+                    eprintln!("Received OAuth Code: {}", code);
+                    
+                    let app_clone = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = exchange_kick_code(app_clone, code).await {
+                             eprintln!("Failed to exchange Kick code: {}", e);
+                        }
+                    });
                 }
             });
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            join_twitch,
+            greet, 
+            join_twitch, 
+            leave_twitch,
+            join_youtube, 
+            open_link, 
+            join_kick,
+            start_kick_oauth,
             send_twitch_message,
-            join_youtube,
-
-            open_link,
+            send_kick_message,
             start_twitch_oauth,
             start_youtube_oauth,
             send_youtube_message

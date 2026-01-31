@@ -34,7 +34,43 @@ const renderMessageWithEmotes = (text: string, emotes?: Emote[], highlightTerms?
         }
     }
 
-    // 2. Process 3rd Party Emotes (String replacement in text nodes)
+    // 2. Process Kick Emotes (String replacement in text nodes)
+    // Format: [emote:ID:Name] - Name allows alphanumeric, dashes, underscores
+    const kickEmoteRegex = /\[emote:(\d+):([\w\-]+)\]/g;
+    
+    // We need to process existing nodes to find these strings
+    let kickProcessedParts: React.ReactNode[] = [];
+    processedNodeParts.forEach(part => {
+        if (typeof part === 'string') {
+            const split = part.split(kickEmoteRegex);
+            // Split will be: ["text before", "ID", "Name", "text after", ...]
+            for (let i = 0; i < split.length; i += 3) {
+                // 1. Text part
+                if (split[i]) kickProcessedParts.push(split[i]);
+                
+                // 2. Emote part (if exists)
+                if (i + 1 < split.length) {
+                    const id = split[i+1];
+                    const name = split[i+2];
+                    const url = `https://files.kick.com/emotes/${id}/fullsize`;
+                    kickProcessedParts.push(
+                        <img 
+                            key={`emote-kick-${id}-${i}`} 
+                            src={url} 
+                            alt={name} 
+                            title={name} 
+                            className="chat-emote" 
+                        />
+                    );
+                }
+            }
+        } else {
+            kickProcessedParts.push(part);
+        }
+    });
+    processedNodeParts = kickProcessedParts;
+
+    // 3. Process 3rd Party Emotes (String replacement in text nodes)
     // Only if we have them
     if (thirdPartyEmotes && thirdPartyEmotes.size > 0) {
         const nextParts: React.ReactNode[] = [];
@@ -65,7 +101,7 @@ const renderMessageWithEmotes = (text: string, emotes?: Emote[], highlightTerms?
         processedNodeParts = nextParts;
     }
 
-    // 3. Process Mentions (String replacement in text nodes)
+    // 4. Process Mentions (String replacement in text nodes)
     const cleanHighlightTerms = (highlightTerms || [])
         .map(t => t.trim().replace(/^@/, '').toLowerCase())
         .filter(t => t.length > 0);
@@ -135,6 +171,12 @@ export const ChatMessageItem = ({ msg, isFavorite, highlightTerms, thirdPartyEmo
                 <span className="platform-icon" style={{color: '#9146FF'}}>
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                         <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
+                    </svg>
+                </span>
+            ) : msg.platform === "Kick" ? (
+                <span className="platform-icon" style={{color: '#53FC18'}}>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                         <path d="M3 21V3h4.6v7.4h.4L13.8 3h5.6l-6.7 7.6 7.1 10.4h-5.6l-5-7.4h-.5v7.4H3z"/> 
                     </svg>
                 </span>
             ) : (

@@ -492,7 +492,8 @@ textarea.favorites-input {
 
 .chat-emote {
     vertical-align: middle;
-    max-height: 28px;
+    height: 28px; /* Force fixed height to prevent layout shift */
+    width: auto;
     margin: 0 2px;
 }
 

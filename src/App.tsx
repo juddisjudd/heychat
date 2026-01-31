@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
@@ -20,16 +20,17 @@ function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [twitchChannel, setTwitchChannel] = useState("");
   const [youtubeVideoId, setYoutubeVideoId] = useState("");
-
+  const [kickChannel, setKickChannel] = useState("");
   const [twitchConnected, setTwitchConnected] = useState(false);
   const [youtubeConnected, setYoutubeConnected] = useState(false);
+  const [kickConnected, setKickConnected] = useState(false);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [favoritesInput, setFavoritesInput] = useState("");
   const [appVersion, setAppVersion] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'TWITCH' | 'YOUTUBE' | 'VIP' | 'MOD'>('ALL');
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'TWITCH' | 'YOUTUBE' | 'KICK' | 'VIP' | 'MOD'>('ALL');
   const [hideBots, setHideBots] = useState(false);
   const [thirdPartyEmotes, setThirdPartyEmotes] = useState<EmoteMap>(new Map());
 
@@ -41,20 +42,28 @@ function App() {
   const [youtubeUser, setYoutubeUser] = useState("");
   
   // Chat Sending Provider
-  const [chatProvider, setChatProvider] = useState<'twitch' | 'youtube'>('twitch');
+  const [chatProvider, setChatProvider] = useState<'twitch' | 'youtube' | 'kick'>('twitch');
   
   // Twitch Auth
   const [twitchUser, setTwitchUser] = useState("");
   const [twitchToken, setTwitchToken] = useState("");
+  
+  // Kick Auth
+  const [kickUser, setKickUser] = useState("");
+  const [kickToken, setKickToken] = useState("");
 
   const addToast = (message: string, type: 'success' | 'error' | 'info' = 'info', duration = 3000) => {
     const id = Date.now().toString() + Math.random().toString();
     setToasts(prev => [...prev, { id, message, type, duration }]);
   };
 
-  const removeToast = (id: string) => {
+  const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
-  };
+  }, []);
+
+  // Actually use useCallback properly
+  // const removeToast = useCallback(...) requires importing useCallback
+  // Let's check imports. Line 1 imports useState, useEffect. Need useCallback.
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -62,6 +71,7 @@ function App() {
     
     const savedTwitch = localStorage.getItem("heychat_twitch_channel");
     const savedYoutube = localStorage.getItem("heychat_youtube_id");
+    const savedKick = localStorage.getItem("heychat_kick_channel");
 
     const savedSidebar = localStorage.getItem("heychat_sidebar_open");
     const savedFavorites = localStorage.getItem("heychat_favorites");
@@ -69,9 +79,12 @@ function App() {
     const savedTwitchToken = localStorage.getItem("heychat_twitch_token");
     const savedYoutubeUser = localStorage.getItem("heychat_youtube_username");
     const savedYoutubeToken = localStorage.getItem("heychat_youtube_token");
+    const savedKickUser = localStorage.getItem("heychat_kick_username");
+    const savedKickToken = localStorage.getItem("heychat_kick_token");
 
     if (savedTwitch) setTwitchChannel(savedTwitch);
     if (savedYoutube) setYoutubeVideoId(savedYoutube);
+    if (savedKick) setKickChannel(savedKick);
 
     if (savedSidebar !== null) setIsSidebarOpen(savedSidebar === "true");
     if (savedFavorites) setFavoritesInput(savedFavorites);
@@ -79,6 +92,8 @@ function App() {
     if (savedTwitchToken) setTwitchToken(savedTwitchToken);
     if (savedYoutubeUser) setYoutubeUser(savedYoutubeUser);
     if (savedYoutubeToken) setYoutubeToken(savedYoutubeToken);
+    if (savedKickUser) setKickUser(savedKickUser);
+    if (savedKickToken) setKickToken(savedKickToken);
   }, []);
 
   // Save settings when they change
@@ -92,7 +107,10 @@ function App() {
     localStorage.setItem("heychat_twitch_token", twitchToken);
     localStorage.setItem("heychat_youtube_username", youtubeUser);
     localStorage.setItem("heychat_youtube_token", youtubeToken);
-  }, [twitchChannel, youtubeVideoId, isSidebarOpen, favoritesInput, twitchUser, twitchToken, youtubeUser, youtubeToken]);
+    localStorage.setItem("heychat_kick_username", kickUser);
+    localStorage.setItem("heychat_kick_token", kickToken);
+    localStorage.setItem("heychat_kick_channel", kickChannel);
+  }, [twitchChannel, youtubeVideoId, kickChannel, isSidebarOpen, favoritesInput, twitchUser, twitchToken, youtubeUser, youtubeToken, kickUser, kickToken]);
 
   useEffect(() => {
     const unlisteners: Promise<() => void>[] = [];
@@ -122,8 +140,19 @@ function App() {
          setYoutubeVideoId(event.payload);
          setYoutubeConnected(true);
       }));
-
-
+          
+      // 3b. Kick Connection Info
+      unlisteners.push(listen<string>("kick-connected", (event) => {
+          console.log("Kick connected:", event.payload);
+          setKickConnected(true);
+          addToast("Connected to Kick", "success");
+      }));
+      
+      unlisteners.push(listen<string>("kick-error", (event) => {
+          console.error("Kick Error:", event.payload);
+          setKickConnected(false);
+          addToast(`Kick Error: ${event.payload}`, "error");
+      }));
 
       // 4. Twitch Error (Auth Failure)
       unlisteners.push(listen<string>("twitch-error", (event) => {
@@ -173,6 +202,27 @@ function App() {
               } catch (e) {
                    addToast("YouTube login failed: " + String(e), 'error');
               }
+          } else if (provider === 'kick') {
+              try {
+                  // Fetch user info from Kick Official API
+                  const res = await fetch('https://api.kick.com/public/v1/users', {
+                      headers: { 
+                          'Authorization': `Bearer ${token}`,
+                          'Accept': 'application/json'
+                      }
+                  });
+                  if (!res.ok) throw new Error('Failed to fetch Kick user info');
+                  const json = await res.json();
+                  // Check data: { data: [ { user_id, name, ... } ] }
+                  const name = json.data?.[0]?.name;
+                  if (name) {
+                      setKickUser(name);
+                      setKickToken(token);
+                      addToast(`Logged in as ${name} (Kick)`, 'success');
+                  }
+              } catch (e) {
+                   addToast("Kick login failed: " + String(e), 'error');
+              }
           }
           
           setIsLoginModalOpen(false);
@@ -209,6 +259,38 @@ function App() {
 
 
 
+  async function fetchKickChannelInfo(channel_slug: string) {
+      const res = await fetch(`https://kick.com/api/v2/channels/${channel_slug}`);
+      if (!res.ok) throw new Error(`Kick API V2 Error: ${res.status}`);
+      
+      const json = await res.json();
+      const chatroomId = json.chatroom?.id;
+      const broadcasterId = json.userid || json.user_id || json.id;
+      
+      if (!chatroomId || !broadcasterId) {
+          throw new Error("Could not find chatroom ID or Broadcaster ID");
+      }
+      return { chatroomId, broadcasterId };
+  }
+
+  async function connectKick() {
+      if (!kickChannel) return;
+      try {
+          addToast(`Connecting to Kick: ${kickChannel}...`, 'info');
+          const { chatroomId, broadcasterId } = await fetchKickChannelInfo(kickChannel);
+          console.log("Kick Info:", { chatroomId, broadcasterId });
+          
+          await invoke("join_kick", { 
+              channel: kickChannel, 
+              chatroomId, 
+              broadcasterUserId: broadcasterId 
+          });
+      } catch (e) {
+          console.error("Failed to connect Kick:", e);
+          addToast("Kick Connection Failed: " + String(e), 'error');
+      }
+  }
+
   async function handleSendMessage(message: string) {
       if (chatProvider === 'twitch' && twitchConnected && twitchToken) {
            const existingMsg = messages.find(m => m.username.toLowerCase() === twitchUser.toLowerCase());
@@ -237,7 +319,34 @@ function App() {
                addToast("Failed to send Twitch message: " + String(e), 'error');
            }
 
-      } else if (chatProvider === 'youtube' && youtubeConnected && youtubeToken) {
+       } else if (chatProvider === 'kick' && kickConnected && kickToken) {
+           const existingMsg = messages.find(m => m.username.toLowerCase() === kickUser.toLowerCase());
+           const userColor = existingMsg?.color || '#53FC18';
+           
+           const tempMessage: ChatMessage = {
+               id: `local-kick-${Date.now()}`,
+               platform: 'Kick',
+               username: kickUser,
+               message: message,
+               color: userColor,
+               badges: existingMsg?.badges || [],
+               is_mod: existingMsg?.is_mod || false,
+               is_vip: existingMsg?.is_vip || false,
+               is_member: false,
+               timestamp: new Date().toISOString(),
+               emotes: [],
+               msg_type: 'chat',
+               system_message: undefined
+           };
+           setMessages(prev => [...prev.slice(-200), tempMessage]);
+
+           try {
+               await invoke("send_kick_message", { channel: kickChannel, message, token: kickToken });
+           } catch (e) {
+               console.error("Failed to send Kick message:", e);
+               addToast("Failed to send Kick message: " + String(e), 'error');
+           }
+       } else if (chatProvider === 'youtube' && youtubeConnected && youtubeToken) {
            // TEMPORARY: Block sending due to API 404 issues
            addToast('YouTube sending is temporarily disabled due to API 404 errors.', 'info');
            return;
@@ -273,7 +382,7 @@ function App() {
       }
   }
 
-  const toggleFilter = (filter: 'ALL' | 'TWITCH' | 'YOUTUBE' | 'VIP' | 'MOD') => {
+  const toggleFilter = (filter: 'ALL' | 'TWITCH' | 'YOUTUBE' | 'KICK' | 'VIP' | 'MOD') => {
       if (activeFilter === filter) setActiveFilter('ALL');
       else setActiveFilter(filter);
   };
@@ -289,13 +398,14 @@ function App() {
   
   const canSendTwitch = twitchConnected && !!twitchToken;
   const canSendYoutube = youtubeConnected && !!youtubeToken;
-  // const canSendYoutube = false; // TEMPORARY: Disabled due to persistent API 404 errors. Reading works, sending is blocked.
+  const canSendKick = kickConnected && !!kickToken;
   
-  // Auto-switch provider: Prefer Twitch if available.
+  // Auto-switch provider: Prefer Twitch, then Kick, then YouTube
   useEffect(() => {
       if (canSendTwitch) setChatProvider('twitch');
+      else if (canSendKick) setChatProvider('kick');
       else if (canSendYoutube) setChatProvider('youtube');
-  }, [canSendTwitch, canSendYoutube]);
+  }, [canSendTwitch, canSendYoutube, canSendKick]);
 
   // Filter Logic
   const favoriteUsers = favoritesInput
@@ -313,7 +423,7 @@ function App() {
     // 2. Platform filter
     if (activeFilter === 'TWITCH' && msg.platform !== 'Twitch') return false;
     if (activeFilter === 'YOUTUBE' && msg.platform !== 'YouTube') return false;
-
+    if (activeFilter === 'KICK' && msg.platform !== 'Kick') return false;
     
     // 3. Role filter
     if (activeFilter === 'VIP' && !msg.is_vip) return false;
@@ -375,9 +485,7 @@ function App() {
                 {youtubeUser ? (
                     <span style={{ fontSize: '0.7em', color: '#ff4444', cursor: 'pointer' }} onClick={() => setIsLoginModalOpen(true)} title="Click to update login">Logged as {youtubeUser}</span>
                 ) : (
-                    <button className="filter-btn" style={{ width: 'auto', padding: '0 6px', fontSize: '0.7em' }} onClick={() => setIsLoginModalOpen(true)}>
-                        <LogIn size={10} style={{ marginRight: 4 }} /> Login
-                    </button>
+                    <span style={{ fontSize: '0.7em', color: '#666' }}>Read-Only</span>
                 )}
             </div>
             <div className="input-row">
@@ -400,6 +508,35 @@ function App() {
             </div>
           </div>
 
+          <div className="connection-group">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h3>KICK</h3>
+                {kickUser ? (
+                    <span style={{ fontSize: '0.7em', color: '#53FC18', cursor: 'pointer' }} onClick={() => setIsLoginModalOpen(true)} title="Click to update login">Logged as {kickUser}</span>
+                ) : (
+                    <span style={{ fontSize: '0.7em', color: '#666' }}>Read-Only</span>
+                )}
+            </div>
+            <div className="input-row">
+                <input
+                  placeholder="Kick Username"
+                  value={kickChannel}
+                  onChange={(e) => setKickChannel(e.target.value)}
+                  disabled={kickConnected}
+                />
+                {!kickConnected ? (
+                  <button onClick={connectKick} className="action-btn">Connect</button>
+                ) : (
+                  <button 
+                    onClick={async () => new Promise(resolve => setTimeout(resolve, 0)).then(() => setKickConnected(false))} 
+                    className="action-btn disconnect-btn"
+                  >
+                    Disconnect
+                  </button>
+                )}
+            </div>
+          </div>
+
 
 
           <div className="connection-group">
@@ -412,29 +549,45 @@ function App() {
              />
           </div>
 
-          <div className="sidebar-footer">
-            <div 
-                onClick={async () => {
-                    try {
-                        await invoke('open_link', { url: 'https://github.com/juddisjudd/heychat' });
-                    } catch (e) {
-                         console.error("Failed to open URL:", e);
-                         window.open('https://github.com/juddisjudd/heychat', '_blank');
-                    }
-                }}
-                className="github-link"
-                title="View Source on GitHub"
-            >
-                <Github size={14} />
-                <span>Open Source</span>
+          <div className="sidebar-footer" style={{ flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <div 
+                    onClick={async () => {
+                        try {
+                            await invoke('open_link', { url: 'https://github.com/juddisjudd/heychat' });
+                        } catch (e) {
+                             console.error("Failed to open URL:", e);
+                             window.open('https://github.com/juddisjudd/heychat', '_blank');
+                        }
+                    }}
+                    className="github-link"
+                    title="View Source on GitHub"
+                >
+                    <Github size={14} />
+                    <span>Open Source</span>
+                </div>
+                
+                <span className="footer-separator" style={{ opacity: 0.3 }}>|</span>
+
+                <div 
+                    onClick={async () => {
+                        try {
+                            await invoke('open_link', { url: 'https://ko-fi.com/ohitsjudd' });
+                        } catch (e) {
+                             console.error("Failed to open URL:", e);
+                             window.open('https://ko-fi.com/ohitsjudd', '_blank');
+                        }
+                    }}
+                    className="github-link" 
+                    title="Support on Ko-fi"
+                    style={{ color: '#FF5E5B' }} 
+                >
+                    <Heart size={14} fill="#FF5E5B" />
+                    <span>Support</span>
+                </div>
             </div>
-            <span className="footer-separator">|</span>
-            <span 
-                className="version-text clickable" 
-                onClick={openReleasesPage}
-                title="Click to View Releases"
-                style={{ cursor: 'pointer', textDecoration: 'underline' }}
-            >
+
+            <span className="version-text" style={{ fontSize: '0.7em', opacity: 0.5 }}>
                 v{appVersion}
             </span>
           </div>
@@ -483,6 +636,16 @@ function App() {
                 </button>
 
                 <button 
+                    className={`filter-btn kick ${activeFilter === 'KICK' ? 'active' : ''}`}
+                    onClick={() => toggleFilter('KICK')}
+                    title="Show Kick Only"
+                    style={{ color: activeFilter === 'KICK' ? '#53FC18' : '' }}
+                >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                         <path d="M3 21V3h4.6v7.4h.4L13.8 3h5.6l-6.7 7.6 7.1 10.4h-5.6l-5-7.4h-.5v7.4H3z"/>
+                    </svg>
+                </button>
+                <button 
                     className={`filter-btn vip ${activeFilter === 'VIP' ? 'active' : ''}`}
                     onClick={() => toggleFilter('VIP')}
                     title="Show VIPs Only"
@@ -520,15 +683,16 @@ function App() {
         <ChatList 
             messages={filteredMessages} 
             favorites={favoriteUsers} 
-            highlightTerms={[twitchChannel, youtubeVideoId].filter(Boolean)}
+            highlightTerms={[twitchChannel, youtubeVideoId, kickChannel].filter(Boolean)}
             thirdPartyEmotes={thirdPartyEmotes}
         />
         
         {/* Chat Input Area */}
-        {(canSendTwitch || canSendYoutube) && (
+        {(canSendTwitch || canSendYoutube || canSendKick) && (
             <div className="chat-input-container">
-                {canSendTwitch && canSendYoutube && (
+                {(Number(canSendTwitch) + Number(canSendYoutube) + Number(canSendKick)) > 1 && (
                     <div className="provider-selector" style={{ display: 'flex', background: '#1a1a1a', borderRadius: '6px', padding: '4px', gap: '4px', border: '1px solid #333' }}>
+                        {canSendTwitch && (
                          <button 
                             className={`platform-toggle-btn ${chatProvider === 'twitch' ? 'active twitch' : ''}`}
                             onClick={() => setChatProvider('twitch')}
@@ -549,6 +713,30 @@ function App() {
                                 <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
                             </svg>
                         </button>
+                        )}
+                        {canSendKick && (
+                         <button 
+                            className={`platform-toggle-btn ${chatProvider === 'kick' ? 'active kick' : ''}`}
+                            onClick={() => setChatProvider('kick')}
+                            title="Send via Kick"
+                            style={{ 
+                                background: chatProvider === 'kick' ? '#53FC18' : 'transparent', 
+                                border: 'none', 
+                                borderRadius: '4px',
+                                padding: '6px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                color: chatProvider === 'kick' ? '#000' : '#666',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                <path d="M3 21V3h4.6v7.4h.4L13.8 3h5.6l-6.7 7.6 7.1 10.4h-5.6l-5-7.4h-.5v7.4H3z"/>
+                            </svg>
+                        </button>
+                        )}
+                        {canSendYoutube && (
                         <button 
                             className={`platform-toggle-btn ${chatProvider === 'youtube' ? 'active youtube' : ''}`}
                             onClick={() => addToast("YouTube sending is temporarily disabled while we work on improvements.", 'info')}
@@ -569,14 +757,17 @@ function App() {
                                 <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                             </svg>
                         </button>
+                        )}
                     </div>
                 )}
                 
                 {/* Single Provider Indicator if only one is available */}
-                {(!canSendTwitch || !canSendYoutube) && (
+                {(Number(canSendTwitch) + Number(canSendYoutube) + Number(canSendKick)) <= 1 && (
                     <div style={{ padding: '8px', color: '#666', opacity: 0.5 }}>
                         {canSendTwitch ? (
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
+                        ) : canSendKick ? (
+                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 3h4v8h4V3h4v6h3.696L22.955 3H21h-2l-4.227 6.34L19 15.227V21h-2h-3.304l-3.696-6h-2v6H4V3z"/></svg> 
                         ) : (
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
                         )}
@@ -586,7 +777,7 @@ function App() {
                 <div style={{ flex: 1 }}>
                     <ChatInput 
                         onSendMessage={handleSendMessage} 
-                        placeholder={`Message ${chatProvider === 'twitch' ? 'Twitch' : 'YouTube'}...`}
+                        placeholder={`Message ${chatProvider === 'twitch' ? 'Twitch' : chatProvider === 'kick' ? 'Kick' : 'YouTube'}...`}
                     />
                 </div>
             </div>
@@ -597,12 +788,26 @@ function App() {
       
       <LoginModal 
         isOpen={isLoginModalOpen} 
-        onClose={() => setIsLoginModalOpen(false)} 
-        onLogin={() => {}} 
+        onClose={() => setIsLoginModalOpen(false)}
+        onLogin={() => {}} // Unused
         twitchUser={twitchUser}
         youtubeUser={youtubeUser}
-        onLogoutTwitch={() => { setTwitchUser(""); setTwitchToken(""); }}
-        onLogoutYoutube={() => { setYoutubeUser(""); setYoutubeToken(""); }}
+        kickUser={kickUser}
+        onLogoutTwitch={() => {
+            setTwitchUser("");
+            setTwitchToken("");
+            addToast("Logged out of Twitch", 'info');
+        }}
+        onLogoutYoutube={() => {
+            setYoutubeUser("");
+            setYoutubeToken("");
+            addToast("Logged out of YouTube", 'info');
+        }}
+        onLogoutKick={() => {
+            setKickUser("");
+            setKickToken("");
+            addToast("Logged out of Kick", 'info');
+        }}
       />
       <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>

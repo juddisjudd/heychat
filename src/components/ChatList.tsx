@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { ChatMessage } from '../types';
 import { ChatMessageItem } from "./ChatMessageItem";
 
@@ -18,8 +18,8 @@ export const ChatList: React.FC<Props> = ({ messages, favorites, highlightTerms,
     const [showScrollButton, setShowScrollButton] = React.useState(false);
     const isProgrammaticScroll = useRef(false);
 
-    // Initial & Auto scroll
-    useEffect(() => {
+    // Initial & Auto scroll - useLayoutEffect for immediate scrolling before paint
+    useLayoutEffect(() => {
         if (isAutoScroll) {
             isProgrammaticScroll.current = true;
             bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
@@ -34,8 +34,8 @@ export const ChatList: React.FC<Props> = ({ messages, favorites, highlightTerms,
         if (!containerRef.current || isProgrammaticScroll.current) return;
         
         const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-        // Increased threshold to 80px for better tolerance
-        const isAtBottom = scrollHeight - scrollTop - clientHeight < 80;
+        // Increased threshold to 150px for better tolerance during fast chat
+        const isAtBottom = scrollHeight - scrollTop - clientHeight < 150;
 
         setIsAutoScroll(isAtBottom);
         setShowScrollButton(!isAtBottom);
