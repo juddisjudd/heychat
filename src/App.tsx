@@ -387,14 +387,7 @@ function App() {
       else setActiveFilter(filter);
   };
 
-  const openReleasesPage = async () => {
-       try {
-           await invoke('open_link', { url: 'https://github.com/juddisjudd/heychat/releases' });
-       } catch (e) {
-           console.error("Failed to open releases:", e);
-           window.open('https://github.com/juddisjudd/heychat/releases', '_blank');
-       }
-  };
+
   
   const canSendTwitch = twitchConnected && !!twitchToken;
   const canSendYoutube = youtubeConnected && !!youtubeToken;

@@ -27,27 +27,7 @@ export function LoginModal({ isOpen, onClose, twitchUser, youtubeUser, kickUser,
       }
   };
 
-  const handleYoutubeLogin = async () => {
-      onClose(); // Assuming 'close()' from the instruction refers to 'onClose()'
-      localStorage.setItem("pending_auth_provider", "youtube");
-      try {
-          await invoke('start_youtube_oauth');
-      } catch (e) {
-          console.error("Failed to start YouTube OAuth:", e);
-          alert("Failed to open browser: " + String(e));
-      }
-  };
 
-  const handleKickLogin = async () => {
-      onClose(); // Assuming 'close()' from the instruction refers to 'onClose()'
-      localStorage.setItem("pending_auth_provider", "kick");
-      try {
-          await invoke("start_kick_oauth");
-      } catch (e) {
-          console.error("Failed to start Kick OAuth:", e);
-          alert("Failed to open browser: " + String(e));
-      }
-  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
