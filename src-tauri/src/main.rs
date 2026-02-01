@@ -63,6 +63,11 @@ fn join_youtube(app: AppHandle, video_id: String) {
 }
 
 #[tauri::command]
+async fn leave_youtube(app: AppHandle) {
+    youtube::leave_youtube_channel(app).await;
+}
+
+#[tauri::command]
 fn open_link(url: String) {
     let _ = opener::open(url);
 }
@@ -70,6 +75,11 @@ fn open_link(url: String) {
 #[tauri::command]
 async fn join_kick(app: AppHandle, channel: String, chatroom_id: u64, broadcaster_user_id: u64) {
     kick::start_kick_handler(app, channel, chatroom_id, broadcaster_user_id, None).await
+}
+
+#[tauri::command]
+async fn leave_kick(app: AppHandle, channel: String) {
+    kick::leave_kick_channel(app, channel).await;
 }
 
 #[tauri::command]
@@ -100,10 +110,18 @@ fn main() {
         .setup(|app| {
             app.manage(twitch::TwitchAppState {
                 client: std::sync::RwLock::new(None),
+                access_token: std::sync::RwLock::new(None),
+                channel_id: std::sync::RwLock::new(None),
+                api_client: reqwest::Client::new(),
+                shutdown_tx: std::sync::RwLock::new(None),
             });
             app.manage(kick::KickState {
                 broadcaster_ids: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
                 pkce_verifier: std::sync::Arc::new(std::sync::Mutex::new(None)),
+                shutdown_tx: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            });
+            app.manage(youtube::YouTubeState {
+                shutdown_tx: std::sync::RwLock::new(None),
             });
 
             let icon_content = include_bytes!("../icons/icon.png");
@@ -151,14 +169,22 @@ fn main() {
             join_twitch, 
             leave_twitch,
             join_youtube, 
+            leave_youtube,
             open_link, 
             join_kick,
+            leave_kick,
             start_kick_oauth,
             send_twitch_message,
             send_kick_message,
             start_twitch_oauth,
             start_youtube_oauth,
-            send_youtube_message
+            send_youtube_message,
+            twitch::twitch_ban_user,
+            twitch::twitch_create_poll,
+            twitch::twitch_create_prediction,
+            twitch::ensure_broadcaster_id,
+            twitch::twitch_get_user_card_data,
+            twitch::twitch_get_user_emotes
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -169,8 +195,9 @@ async fn start_twitch_oauth(app: AppHandle) -> Result<(), String> {
     let client_id = "j07v9449bxjpfqx1msfnceaol2uwhx"; 
     let redirect_uri_encoded = "https%3A%2F%2Fheychatapp.com%2Fauth"; 
     
+    // Added user:read:emotes
     let url = format!(
-        "https://id.twitch.tv/oauth2/authorize?response_type=token&client_id={}&redirect_uri={}&scope=chat%3Aread+chat%3Aedit",
+        "https://id.twitch.tv/oauth2/authorize?response_type=token&client_id={}&redirect_uri={}&scope=chat%3Aread+chat%3Aedit+channel%3Amanage%3Apolls+channel%3Amanage%3Apredictions+moderator%3Amanage%3Abanned_users+moderator%3Aread%3Afollowers+channel%3Aread%3Asubscriptions+user%3Aread%3Aemotes",
         client_id, redirect_uri_encoded
     );
 

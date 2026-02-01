@@ -1,13 +1,37 @@
 use crate::models::{ChatMessage, Platform};
 use reqwest::Client;
 use serde_json::Value;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use regex::Regex;
 use std::time::Duration;
+
+// Use a State struct for shutdown management
+pub struct YouTubeState {
+    pub shutdown_tx: std::sync::RwLock<Option<tokio::sync::broadcast::Sender<()>>>,
+}
 
 pub async fn start_youtube_handler(app: AppHandle, video_id: String) {
     let app_clone = app.clone();
     
+    // Check if we need to shut down previous instance? Or assumes UI handles it.
+    // Ideally we should store shutdown handle.
+    let state = app.state::<YouTubeState>();
+    
+    // Create new shutdown channel
+    let (tx, mut rx) = tokio::sync::broadcast::channel(1);
+    
+    {
+        // Cancel previous if exists? Or just overwrite?
+        // If we overwrite, previous one might run forever if it didn't get signal.
+        // We should send signal first if it exists.
+        let mut guard = state.shutdown_tx.write().unwrap();
+        if let Some(old_tx) = guard.take() {
+             eprintln!("Youtube Handler: Stopping previous instance...");
+             let _ = old_tx.send(());
+        }
+        *guard = Some(tx);
+    }
+
     // 1. Extract Video ID from URL if needed
     let client = Client::builder()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
@@ -162,6 +186,12 @@ pub async fn start_youtube_handler(app: AppHandle, video_id: String) {
     
     let mut polling = true;
     while polling {
+        // Shutdown check before poll
+        if rx.try_recv().is_ok() {
+             eprintln!("YouTube handler received shutdown.");
+             break;
+        }
+
         let chat_url = format!("https://www.youtube.com/youtubei/v1/live_chat/get_live_chat?key={}", api_key);
         
         let body = serde_json::json!({
@@ -320,7 +350,24 @@ pub async fn start_youtube_handler(app: AppHandle, video_id: String) {
             }
         }
         
-        tokio::time::sleep(Duration::from_secs(1)).await; // Polling interval
+        // Cancellable Sleep
+        tokio::select! {
+             biased;
+             _ = rx.recv() => {
+                  eprintln!("YouTube handler received shutdown during sleep.");
+                  break;
+             }
+             _ = tokio::time::sleep(Duration::from_secs(1)) => {}
+        }
+    }
+}
+
+pub async fn leave_youtube_channel(app: AppHandle) {
+    eprintln!("Leaving YouTube channel...");
+    let state = app.state::<YouTubeState>();
+    let mut guard = state.shutdown_tx.write().unwrap();
+    if let Some(tx) = guard.take() {
+        let _ = tx.send(());
     }
 }
 

@@ -51,15 +51,43 @@ interface FFZRoomResponse {
     };
 }
 
-export const fetchThirdPartyEmotes = async (channelId: string): Promise<EmoteMap> => {
+export interface EmoteCategory {
+    provider: '7tv' | 'bttv' | 'ffz' | 'twitch';
+    emotes: { code: string; url: string; id: string }[];
+}
+
+export interface EmoteData {
+    map: EmoteMap;
+    categories: {
+        sevenTV: { global: EmoteCategory['emotes']; channel: EmoteCategory['emotes'] };
+        bttv: { global: EmoteCategory['emotes']; channel: EmoteCategory['emotes'] };
+        ffz: { global: EmoteCategory['emotes']; channel: EmoteCategory['emotes'] };
+    };
+}
+
+export const fetchThirdPartyEmotes = async (channelId: string): Promise<EmoteData> => {
     const emoteMap = new Map<string, string>();
+    const categories = {
+        sevenTV: { global: [] as any[], channel: [] as any[] },
+        bttv: { global: [] as any[], channel: [] as any[] },
+        ffz: { global: [] as any[], channel: [] as any[] }
+    };
 
     console.log(`Fetching 3rd party emotes for channel ID: ${channelId}`);
 
     // Helper to add emote safely
-    const addEmote = (code: string, url: string) => {
+    const addEmote = (code: string, url: string, id: string, provider: '7tv' | 'bttv' | 'ffz', type: 'global' | 'channel') => {
         if (!emoteMap.has(code)) {
             emoteMap.set(code, url);
+        }
+        
+        const emoteObj = { code, url, id };
+        if (provider === '7tv') {
+            categories.sevenTV[type].push(emoteObj);
+        } else if (provider === 'bttv') {
+            categories.bttv[type].push(emoteObj);
+        } else if (provider === 'ffz') {
+            categories.ffz[type].push(emoteObj);
         }
     };
 
@@ -68,7 +96,7 @@ export const fetchThirdPartyEmotes = async (channelId: string): Promise<EmoteMap
         const resp = await fetch('https://api.betterttv.net/3/cached/emotes/global');
         if (resp.ok) {
             const data: BTTVEmote[] = await resp.json();
-            data.forEach(e => addEmote(e.code, `https://cdn.betterttv.net/emote/${e.id}/2x`));
+            data.forEach(e => addEmote(e.code, `https://cdn.betterttv.net/emote/${e.id}/2x`, e.id, 'bttv', 'global'));
         }
     } catch (e) {
         console.error("Failed to fetch BTTV Global", e);
@@ -79,11 +107,11 @@ export const fetchThirdPartyEmotes = async (channelId: string): Promise<EmoteMap
         const resp = await fetch(`https://api.betterttv.net/3/cached/users/twitch/${channelId}`);
         if (resp.ok) {
             const data: BTTVUserResponse = await resp.json();
-            const all = [...(data.channelEmotes || []), ...(data.sharedEmotes || [])];
-            all.forEach(e => addEmote(e.code, `https://cdn.betterttv.net/emote/${e.id}/2x`));
+            if (data.channelEmotes) data.channelEmotes.forEach(e => addEmote(e.code, `https://cdn.betterttv.net/emote/${e.id}/2x`, e.id, 'bttv', 'channel'));
+            if (data.sharedEmotes) data.sharedEmotes.forEach(e => addEmote(e.code, `https://cdn.betterttv.net/emote/${e.id}/2x`, e.id, 'bttv', 'channel'));
         }
     } catch (e) {
-        console.warn("BTTV Channel fetch failed (might not be registered)", e);
+        console.warn("BTTV Channel fetch failed", e);
     }
 
     // 3. FrankerFaceZ Global
@@ -94,7 +122,7 @@ export const fetchThirdPartyEmotes = async (channelId: string): Promise<EmoteMap
             Object.values(data.sets).forEach(set => {
                 set.emoticons.forEach(e => {
                     const url = e.urls["2"] || e.urls["1"];
-                    addEmote(e.name, url); // FFZ uses protocol-relative URLs sometimes? No, usually https
+                    addEmote(e.name, url, e.id.toString(), 'ffz', 'global');
                 });
             });
         }
@@ -110,7 +138,7 @@ export const fetchThirdPartyEmotes = async (channelId: string): Promise<EmoteMap
             Object.values(data.sets).forEach(set => {
                 set.emoticons.forEach(e => {
                     const url = e.urls["2"] || e.urls["1"];
-                    addEmote(e.name, url);
+                    addEmote(e.name, url, e.id.toString(), 'ffz', 'channel');
                 });
             });
         }
@@ -122,15 +150,14 @@ export const fetchThirdPartyEmotes = async (channelId: string): Promise<EmoteMap
     try {
         const resp = await fetch('https://7tv.io/v3/emote-sets/global');
         if (resp.ok) {
-           // x.x.x
            const globalData = await resp.json();
            if (globalData.emotes) {
-               globalData.emotes.forEach((e: any) => { // Use 'any' or defined type, reusing existing logic
+               globalData.emotes.forEach((e: any) => {
                     const host = e.data.host;
                     const filename = e.data.host.files.find((f: any) => f.format === 'WEBP' && f.name === '2x.webp')?.name 
                                   || e.data.host.files[0].name;
                     const url = `https:${host.url}/${filename}`; 
-                    addEmote(e.name, url);
+                    addEmote(e.name, url, e.id, '7tv', 'global');
                });
            }
         }
@@ -144,13 +171,13 @@ export const fetchThirdPartyEmotes = async (channelId: string): Promise<EmoteMap
         if (resp.ok) {
             const data: SevenTVUserResponse = await resp.json();
             if (data.emote_set && data.emote_set.emotes) {
-                data.emote_set.emotes.forEach(e => {
+                data.emote_set.emotes.forEach((e: any) => {
                     const host = e.data.host;
-                    const filename = e.data.host.files.find(f => f.format === 'WEBP' && f.name === '2x.webp')?.name 
+                    const filename = e.data.host.files.find((f: any) => f.format === 'WEBP' && f.name === '2x.webp')?.name 
                                   || e.data.host.files[0].name;
                     
                     const url = `https:${host.url}/${filename}`; 
-                    addEmote(e.name, url);
+                    addEmote(e.name, url, e.id, '7tv', 'channel');
                 });
             }
         }
@@ -159,8 +186,6 @@ export const fetchThirdPartyEmotes = async (channelId: string): Promise<EmoteMap
     }
 
     console.log(`Loaded ${emoteMap.size} 3rd party emotes.`);
-    // Debug: Print a few
-    console.log("Sample emotes:", Array.from(emoteMap.keys()).slice(0, 10));
     
-    return emoteMap;
+    return { map: emoteMap, categories };
 };

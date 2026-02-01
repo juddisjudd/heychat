@@ -9,9 +9,10 @@ interface Props {
     favorites: string[];
     highlightTerms: string[];
     thirdPartyEmotes?: EmoteMap;
+    onUserClick?: (username: string) => void;
 }
 
-export const ChatList: React.FC<Props> = ({ messages, favorites, highlightTerms, thirdPartyEmotes }) => {
+export const ChatList: React.FC<Props> = ({ messages, favorites, highlightTerms, thirdPartyEmotes, onUserClick }) => {
     const bottomRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isAutoScroll, setIsAutoScroll] = React.useState(true);
@@ -59,6 +60,7 @@ export const ChatList: React.FC<Props> = ({ messages, favorites, highlightTerms,
                     isFavorite={favorites.includes(msg.username.toLowerCase())}
                     highlightTerms={highlightTerms}
                     thirdPartyEmotes={thirdPartyEmotes}
+                    onUserClick={onUserClick}
                 />
             ))}
             <div ref={bottomRef} />

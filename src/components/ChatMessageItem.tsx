@@ -1,150 +1,22 @@
-import React from 'react';
-import { ChatMessage, Emote } from "../types";
-import { Star } from "lucide-react"; // Import necessary icons
+import { ChatMessage } from "../types";
+import { Star } from "lucide-react"; 
+import { useChatSettings } from "../context/ChatSettingsContext";
 
-// Helper to replace text with emote images
-// Helper to replace text with emote images AND highlight mentions
-const renderMessageWithEmotes = (text: string, emotes?: Emote[], highlightTerms?: string[], thirdPartyEmotes?: Map<string, string>) => {
-    // 1. Split by emotes first (highest priority, Twitch/YT native)
-    
-    // Sort native emotes
-    const sortedEmotes = emotes ? [...emotes].sort((a, b) => a.start - b.start) : [];
-    
-    // Process Native Emotes (Slicing style)
-    let processedNodeParts: React.ReactNode[] = [];
-    
-    if (sortedEmotes.length === 0) {
-        processedNodeParts = [text];
-    } else {
-        let lastIndex = 0;
-        sortedEmotes.forEach(emote => {
-            if (emote.start > lastIndex) {
-                 processedNodeParts.push(text.substring(lastIndex, emote.start));
-            }
-            const url = emote.id.startsWith('http') 
-                ? emote.id 
-                : `https://static-cdn.jtvnw.net/emoticons/v2/${emote.id}/default/dark/1.0`;
-            processedNodeParts.push(
-                <img key={`emote-native-${emote.id}-${emote.start}`} src={url} alt={emote.code} title={emote.code} className="chat-emote" />
-            );
-            lastIndex = emote.end + 1;
-        });
-        if (lastIndex < text.length) {
-            processedNodeParts.push(text.substring(lastIndex));
-        }
-    }
-
-    // 2. Process Kick Emotes (String replacement in text nodes)
-    // Format: [emote:ID:Name] - Name allows alphanumeric, dashes, underscores
-    const kickEmoteRegex = /\[emote:(\d+):([\w\-]+)\]/g;
-    
-    // We need to process existing nodes to find these strings
-    let kickProcessedParts: React.ReactNode[] = [];
-    processedNodeParts.forEach(part => {
-        if (typeof part === 'string') {
-            const split = part.split(kickEmoteRegex);
-            // Split will be: ["text before", "ID", "Name", "text after", ...]
-            for (let i = 0; i < split.length; i += 3) {
-                // 1. Text part
-                if (split[i]) kickProcessedParts.push(split[i]);
-                
-                // 2. Emote part (if exists)
-                if (i + 1 < split.length) {
-                    const id = split[i+1];
-                    const name = split[i+2];
-                    const url = `https://files.kick.com/emotes/${id}/fullsize`;
-                    kickProcessedParts.push(
-                        <img 
-                            key={`emote-kick-${id}-${i}`} 
-                            src={url} 
-                            alt={name} 
-                            title={name} 
-                            className="chat-emote" 
-                        />
-                    );
-                }
-            }
-        } else {
-            kickProcessedParts.push(part);
-        }
-    });
-    processedNodeParts = kickProcessedParts;
-
-    // 3. Process 3rd Party Emotes (String replacement in text nodes)
-    // Only if we have them
-    if (thirdPartyEmotes && thirdPartyEmotes.size > 0) {
-        const nextParts: React.ReactNode[] = [];
-        
-        processedNodeParts.forEach(part => {
-             if (typeof part === 'string') {
-                 // Split by spaces to find emote codes
-                 // Using regex bound by spaces or start/end of string
-                 // Note: Emote codes can be "KEKW" or ":)" or "Ah_Yes"
-                 // Simple split by space is safest for chat generally
-                 const words = part.split(/(\s+)/); // Capture spaces to preserve them
-                 
-                 words.forEach((word, idx) => {
-                     const cleanWord = word.trim();
-                     if (thirdPartyEmotes.has(cleanWord)) {
-                         const url = thirdPartyEmotes.get(cleanWord)!;
-                         nextParts.push(
-                             <img key={`emote-3p-${idx}-${cleanWord}`} src={url} alt={cleanWord} title={cleanWord} className="chat-emote" />
-                         );
-                     } else {
-                         nextParts.push(word);
-                     }
-                 });
-             } else {
-                 nextParts.push(part);
-             }
-        });
-        processedNodeParts = nextParts;
-    }
-
-    // 4. Process Mentions (String replacement in text nodes)
-    const cleanHighlightTerms = (highlightTerms || [])
-        .map(t => t.trim().replace(/^@/, '').toLowerCase())
-        .filter(t => t.length > 0);
-
-    const generalMentionRegex = /(@[\w]+)(?![\w])/gi;
-
-    return processedNodeParts.map((part, index) => {
-        if (typeof part !== 'string') return part;
-
-        // Skip if whitespace only (optimization)
-        if (!part.trim()) return part;
-
-        const split = part.split(generalMentionRegex);
-        if (split.length === 1) return part;
-
-        return (
-            <span key={`mention-part-${index}`}>
-                {split.map((chunk, i) => {
-                     if (chunk.match(generalMentionRegex)) {
-                        const cleanChunk = chunk.replace(/^@/, '').toLowerCase();
-                        if (cleanHighlightTerms.includes(cleanChunk)) {
-                            return <span key={i} className="mention-highlight">{chunk}</span>;
-                        } else {
-                            return <span key={i} className="mention-bold">{chunk}</span>;
-                        }
-                    }
-                    return chunk;
-                })}
-            </span>
-        );
-    });
-};
+import { renderMessageWithEmotes } from "../utils/chatRenderer";
 
 interface Props {
   msg: ChatMessage;
   isFavorite: boolean;
   highlightTerms: string[];
   thirdPartyEmotes?: Map<string, string>;
+  onUserClick?: (username: string) => void;
 }
 
-export const ChatMessageItem = ({ msg, isFavorite, highlightTerms, thirdPartyEmotes }: Props) => {
+export const ChatMessageItem = ({ msg, isFavorite, highlightTerms, thirdPartyEmotes, onUserClick }: Props) => {
+  const { settings } = useChatSettings();
   const isMod = msg.is_mod;
   const isVip = msg.is_vip;
+
 
   let messageClass = "chat-message-item";
   if (isFavorite) messageClass += " favorite-message";
@@ -156,37 +28,70 @@ export const ChatMessageItem = ({ msg, isFavorite, highlightTerms, thirdPartyEmo
   }
 
   return (
-    <div className={messageClass}>
+    <div 
+        className={messageClass}
+        style={{
+            fontSize: `${settings.fontSize}px`,
+            lineHeight: settings.lineHeight,
+            paddingTop: `${settings.messageSpacing / 2}px`,
+            paddingBottom: `${settings.messageSpacing / 2}px`,
+            '--mod-color': msg.platform === 'Kick' ? settings.kickModColor : settings.twitchModColor,
+            '--vip-color': msg.platform === 'Kick' ? settings.kickVipColor : settings.twitchVipColor,
+            '--member-color': settings.youtubeMemberColor
+        } as any}
+    >
       <div className="message-meta">
+        {settings.showTimestamp && (
+            <span className="timestamp" style={{ marginRight: '6px', opacity: 0.5, fontSize: '0.9em' }}>
+                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+        )}
+
         {/* Badges / Icons */}
-        <div className="badges">
-            {/* Show Mod/VIP badges even on subs */}
-            {isFavorite && <Star size={14} className="favorite-badge" fill="currentColor" />}
-            {isMod && <span className="mod-badge-text">MOD</span>}
-            {isVip && <span className="vip-badge-text">VIP</span>}
-            {msg.is_member && <span className="member-badge-text">MEMBER</span>}
-            
-            {/* Platform Icon */}
-            {msg.platform === "Twitch" ? (
-                <span className="platform-icon" style={{color: '#9146FF'}}>
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                        <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
-                    </svg>
-                </span>
-            ) : msg.platform === "Kick" ? (
-                <span className="platform-icon" style={{color: '#53FC18'}}>
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                         <path d="M3 21V3h4.6v7.4h.4L13.8 3h5.6l-6.7 7.6 7.1 10.4h-5.6l-5-7.4h-.5v7.4H3z"/> 
-                    </svg>
-                </span>
-            ) : (
-                <span className="platform-icon" style={{color: '#FF0000'}}>
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                    </svg>
-                </span>
-            )}
-        </div><span className="username" style={{ color: msg.color || (isFavorite ? '#ffd700' : 'inherit') }}>{msg.username}</span><span className="separator">:</span>
+        {settings.showBadges && (
+            <div className="badges">
+                {/* Show Mod/VIP badges even on subs */}
+                {isFavorite && <Star size={14} className="favorite-badge" fill="currentColor" />}
+                {isMod && <span className="mod-badge-text">MOD</span>}
+                {isVip && <span className="vip-badge-text">VIP</span>}
+                {msg.is_member && <span className="member-badge-text">MEMBER</span>}
+                
+                {/* Platform Icon */}
+                {msg.platform === "Twitch" ? (
+                    <span className="platform-icon" style={{color: '#9146FF'}}>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                            <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
+                        </svg>
+                    </span>
+                ) : msg.platform === "Kick" ? (
+                    <span className="platform-icon" style={{color: '#53FC18'}}>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                            <path d="M3 21V3h4.6v7.4h.4L13.8 3h5.6l-6.7 7.6 7.1 10.4h-5.6l-5-7.4h-.5v7.4H3z"/> 
+                        </svg>
+                    </span>
+                ) : (
+                    <span className="platform-icon" style={{color: '#FF0000'}}>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                        </svg>
+                    </span>
+                )}
+            </div>
+        )}
+        
+        <span 
+            className="username" 
+            onClick={() => onUserClick?.(msg.username)}
+            style={{ 
+                color: settings.usernameColor === 'static' 
+                    ? settings.staticUsernameColor 
+                    : (msg.color || (isFavorite ? '#ffd700' : 'inherit')),
+                cursor: 'pointer' 
+            }}
+        >
+            {msg.username}
+        </span>
+        <span className="separator">:</span>
       </div>
       
       {msg.msg_type === 'sub' && msg.system_message && (

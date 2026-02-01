@@ -20,9 +20,8 @@ const PUSHER_CLUSTER: &str = "us2";
 pub struct KickState {
     pub broadcaster_ids: Arc<Mutex<HashMap<String, u64>>>,
     pub pkce_verifier: Arc<Mutex<Option<String>>>,
+    pub shutdown_tx: Arc<Mutex<Option<tokio::sync::broadcast::Sender<()>>>>,
 }
-
-
 
 pub async fn start_kick_oauth(app: AppHandle) -> Result<(), String> {
     let client_id = "01KG9BKAZPA62J13S6PATK3BWN";
@@ -104,6 +103,10 @@ pub async fn start_kick_handler(app: AppHandle, channel: String, chatroom_id: u6
 
     let _ = app.emit("kick-connected", channel_slug.clone());
 
+    // Create shutdown channel
+    let (tx, mut rx) = tokio::sync::broadcast::channel(1);
+    *state.shutdown_tx.lock().unwrap() = Some(tx);
+
     // 2. Connect to Pusher (Read-Only)
     let ws_url = format!(
         "wss://ws-{}.pusher.com/app/{}?protocol=7&client=js&version=8.4.0-rc2&flash=false",
@@ -135,24 +138,53 @@ pub async fn start_kick_handler(app: AppHandle, channel: String, chatroom_id: u6
          return;
     }
 
-    // 4. Loop
-    while let Some(msg_result) = read.next().await {
-        match msg_result {
-            Ok(msg) => {
-                match msg {
-                    Message::Text(text) => {
-                        eprintln!("Kick Raw WS: {}", text.chars().take(200).collect::<String>());
-                        handle_kick_message(&app, &text)
-                    },
-                    Message::Ping(ping) => { let _ = write.send(Message::Pong(ping)).await; },
-                    _ => {}
-                }
-            }
-            Err(e) => {
-                eprintln!("Kick WS Error: {}", e);
-                break;
-            }
+    // 4. Loop with Shutdown
+    loop {
+        tokio::select! {
+             biased;
+             _ = rx.recv() => {
+                 eprintln!("Kick handler received shutdown signal.");
+                 break;
+             }
+             msg_result = read.next() => {
+                 match msg_result {
+                    Some(Ok(msg)) => {
+                        match msg {
+                            Message::Text(text) => {
+                                // eprintln!("Kick Raw WS: {}", text.chars().take(200).collect::<String>());
+                                handle_kick_message(&app, &text)
+                            },
+                            Message::Ping(ping) => { let _ = write.send(Message::Pong(ping)).await; },
+                            _ => {}
+                        }
+                    }
+                    Some(Err(e)) => {
+                        eprintln!("Kick WS Error: {}", e);
+                        break;
+                    }
+                    None => {
+                        eprintln!("Kick WS Stream ended");
+                        break;
+                    }
+                 }
+             }
         }
+    }
+}
+
+pub async fn leave_kick_channel(app: AppHandle, channel: String) {
+    eprintln!("Leaving Kick channel: {}", channel);
+    let state = app.state::<KickState>();
+    // Clone Arc to avoid lifetime issues with State borrow
+    let shutdown_arc = state.shutdown_tx.clone();
+    
+    let tx_opt = {
+        let mut guard = shutdown_arc.lock().unwrap();
+        guard.take()
+    };
+
+    if let Some(tx) = tx_opt {
+        let _ = tx.send(());
     }
 }
 

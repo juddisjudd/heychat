@@ -139,7 +139,7 @@ body {
 }
 
 .mod-badge-text {
-  background-color: #00ad03;
+  background-color: var(--mod-color, #00ad03);
   color: #fff;
   font-size: 0.65rem;
   font-weight: 700;
@@ -191,14 +191,14 @@ body {
 }
 
 .mod-message {
-  background: linear-gradient(to right, rgba(0, 173, 3, 0.15), rgba(0, 173, 3, 0));
+  background: linear-gradient(to right, color-mix(in srgb, var(--mod-color, #00ad03) 15%, transparent), color-mix(in srgb, var(--mod-color, #00ad03) 0%, transparent));
 }
 .mod-message::before {
-  background-color: #00ad03;
+  background-color: var(--mod-color, #00ad03);
 }
 
 .vip-badge-text {
-  background-color: #e9199f;
+  background-color: var(--vip-color, #e9199f);
   color: #fff;
   font-size: 0.65rem;
   font-weight: 700;
@@ -209,7 +209,7 @@ body {
 }
 
 .member-badge-text {
-  background-color: #0f9d58;
+  background-color: var(--member-color, #0f9d58);
   color: #fff;
   font-size: 0.65rem;
   font-weight: 700;
@@ -231,10 +231,10 @@ body {
 }
 
 .vip-message {
-  background: linear-gradient(to right, rgba(233, 25, 159, 0.15), rgba(233, 25, 159, 0));
+  background: linear-gradient(to right, color-mix(in srgb, var(--vip-color, #e9199f) 15%, transparent), color-mix(in srgb, var(--vip-color, #e9199f) 0%, transparent));
 }
 .vip-message::before {
-  background-color: #e9199f;
+  background-color: var(--vip-color, #e9199f);
 }
 
 .sub-message {
